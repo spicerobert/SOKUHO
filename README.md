@@ -30,9 +30,6 @@ uv run python main.py --pdf-dir "E:/OneDrive - Aunt Stella Company/SOKUHO/2026" 
 uv run python main.py --from-date 2026-03-01 --to-date 2026-03-31 --dry-run
 ```
 
-<<<<<<< HEAD
-**補充**
-=======
 ## 門市主檔 seed（dim_store）
 
 使用與 ETL 相同的 `.env`（`DB_SERVER`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`）連線 SQL Server，執行 `db/seed_stores.sql` 的 MERGE（可重複執行、不會重複插入同名門市）。
@@ -43,8 +40,22 @@ uv run python db/apply_seed_stores.py
 
 請在**專案根目錄**執行；若尚未安裝依賴，先執行 `uv sync`。
 
+**Docker 內的 SQL Server**（本機 `docker compose up -d`）：`sqlserver` 服務已掛載 `./db` 至容器內 `/db`。更新 `db/seed_stores.sql` 後可擇一執行：
+
+```powershell
+# 一次性容器：套用最新 seed 至 dim_store（需已執行過 db/schema.sql）
+docker compose --profile seed-dim run --rm dim-store-seed
+```
+
+或進入主容器手動：
+
+```powershell
+docker compose exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -i /db/seed_stores.sql
+```
+
+（密碼與 `docker-compose.yml` 的 `SA_PASSWORD`／`SQLCMDPASSWORD` 一致；`exec` 時可加 `-P` 或設定環境變數 `SQLCMDPASSWORD`。）
+
 ### 補充
->>>>>>> fd1c75e031f541f3b3206444330db5278a7d016f
 
 - `--unknown-store-policy` 預設為 `skip_row`（未知門市只略過該列，其餘照常匯入）。
 - 若只新增不覆蓋舊資料，請不要加 `--force`。
@@ -147,13 +158,16 @@ Date =
 
 ```powershell
 # 啟動 SQL Server（Docker）
-docker-compose up -d
+docker compose up -d
 
-# 建立資料庫與 Views
+# 建立資料庫與 Views（主機 sqlcmd 或進容器執行 /db/schema.sql）
 sqlcmd -S localhost,1433 -U sa -P <password> -i db/schema.sql
 
-# 匯入門市主檔
+# 匯入門市主檔 dim_store（主機 sqlcmd）
 sqlcmd -S localhost,1433 -U sa -P <password> -i db/seed_stores.sql
+
+# 若 SQL 已在 Docker 內、且已掛載 ./db，可改用：
+docker compose --profile seed-dim run --rm dim-store-seed
 ```
 
 若資料庫仍是含 `area` 欄位的舊版 `dim_store`，請先執行 `db/migrate_dim_store_codes.sql` 再執行 seed。
