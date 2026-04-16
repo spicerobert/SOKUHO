@@ -10,6 +10,8 @@ services:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
+      # 掛載 db 方便在容器內執行 sqlcmd，或供 dim-store-seed 套用 seed_stores.sql
+      - ./db:/db:ro
     healthcheck:
       test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd",
              "-S", "localhost", "-U", "sa", "-P", "${SA_PASSWORD:-PosInsight@2024}",
@@ -17,6 +19,29 @@ services:
       interval: 10s
       retries: 10
       start_period: 30s
+
+  # 將 db/seed_stores.sql MERGE 至 dim_store（可重複執行）。需已存在 PosInsight 與 dim_store（先跑 schema.sql）。
+  # 使用：docker compose --profile seed-dim run --rm dim-store-seed
+  dim-store-seed:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["seed-dim"]
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      SQLCMDPASSWORD: "${SA_PASSWORD:-PosInsight@2024}"
+    volumes:
+      - ./db:/db:ro
+    entrypoint: ["/opt/mssql-tools18/bin/sqlcmd"]
+    command:
+      - "-S"
+      - "sqlserver"
+      - "-U"
+      - "sa"
+      - "-C"
+      - "-b"
+      - "-i"
+      - "/db/seed_stores.sql"
 
 volumes:
   sqlserver_data:

@@ -13,7 +13,7 @@ SOKUHO 是將每日 PDF 銷售速報（SOKUHO）匯入 SQL Server 的 ETL 工具
 **環境設定（首次）：**
 ```bash
 cp .env.example .env        # 填入 DB 連線資訊
-docker-compose up -d        # 啟動 SQL Server（可選，也可用現有 SQL Server）
+docker compose up -d        # 啟動 SQL Server（可選，也可用現有 SQL Server）
 uv sync                     # 安裝依賴
 ```
 
@@ -21,6 +21,7 @@ uv sync                     # 安裝依賴
 ```
 sqlcmd -S localhost,1433 -U sa -P <password> -i db/schema.sql
 sqlcmd -S localhost,1433 -U sa -P <password> -i db/seed_stores.sql
+# 若 SQL 跑在 Docker 且已掛載 ./db：docker compose --profile seed-dim run --rm dim-store-seed
 ```
 
 **執行 ETL：**
