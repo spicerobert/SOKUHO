@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//e/OneDrive - Aunt Stella Company/KOUSEIHI/**)",
+      "Bash(uv run *)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

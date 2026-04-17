@@ -1,0 +1,5 @@
+﻿group,model,val_mape_loyo_pct,test_mape_2025_pct
+GIFT_LOW,XGBoost_rw,16.12,13.31
+GIFT_HIGH,"Ensemble_top3(XGBoost_rw,XGBoost_log1p_rw,XGBoost)",27.71,23.99
+GIFT_LARGE,XGBoost,20.84,16.02
+GIFT_COMBINED,bottom-up (LOW+HIGH),,13.57

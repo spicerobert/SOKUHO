@@ -1,0 +1,59 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:           sales_result   R-squared:                       0.947
+Model:                            OLS   Adj. R-squared:                  0.908
+Method:                 Least Squares   F-statistic:                     24.18
+Date:                Fri, 17 Apr 2026   Prob (F-statistic):           2.36e-12
+Time:                        01:46:54   Log-Likelihood:                -728.10
+No. Observations:                  48   AIC:                             1498.
+Df Residuals:                      27   BIC:                             1537.
+Df Model:                          20                                         
+Covariance Type:            nonrobust                                         
+====================================================================================================
+                                       coef    std err          t      P>|t|      [0.025      0.975]
+----------------------------------------------------------------------------------------------------
+const                             1.799e+05   1.04e+05      1.728      0.095   -3.37e+04    3.93e+05
+dept_store_sales                 -5.371e+06   1.86e+06     -2.895      0.007   -9.18e+06   -1.56e+06
+retail_food_index                -1.421e+06   6.34e+05     -2.242      0.033   -2.72e+06   -1.21e+05
+cci_index                         4.332e+06   2.59e+06      1.675      0.106   -9.75e+05    9.64e+06
+cpi_food_yoy_pct                 -5.001e+05   1.33e+06     -0.375      0.710   -3.24e+06    2.23e+06
+avg_wage_yoy_pct                 -1.045e+06   8.95e+05     -1.167      0.253   -2.88e+06    7.92e+05
+unemployment_rate                -2.987e+05    4.1e+05     -0.728      0.473   -1.14e+06    5.43e+05
+twd_jpy_rate                     -1.306e+04   3.03e+04     -0.431      0.670   -7.52e+04    4.91e+04
+twd_usd_rate                     -3.302e+05   1.56e+06     -0.212      0.834   -3.53e+06    2.87e+06
+inbound_tourists                    27.8764     27.718      1.006      0.323     -28.996      84.749
+bsi_index                        -1.472e+06   7.37e+05     -1.997      0.056   -2.98e+06    4.02e+04
+gdp_yoy_pct                       2.889e+07    1.2e+07      2.410      0.023     4.3e+06    5.35e+07
+private_consumption_real_yoy_pct -1.045e+06   8.95e+05     -1.167      0.253   -2.88e+06    7.92e+05
+gift_market_sentiment_index      -1.472e+06   7.37e+05     -1.997      0.056   -2.98e+06    4.02e+04
+stock_wealth_effect_index         1.344e+05    1.7e+05      0.793      0.435   -2.14e+05    4.82e+05
+working_days                     -1.032e-11   8.98e-10     -0.011      0.991   -1.85e-09    1.83e-09
+has_lunar_new_year                6.984e+06   1.81e+06      3.853      0.001    3.27e+06    1.07e+07
+has_mid_autumn                    6.103e+06   2.79e+06      2.190      0.037    3.84e+05    1.18e+07
+sales_yoy_pct                     1.589e-09   8.85e-10      1.796      0.084   -2.26e-10    3.41e-09
+composition_curr_pct              3.886e+04   7.66e+04      0.507      0.616   -1.18e+05    1.96e+05
+composition_prev_pct             -2.458e+05   8.25e+04     -2.978      0.006   -4.15e+05   -7.65e+04
+threshold_floor                           0          0        nan        nan           0           0
+threshold_ceiling                         0          0        nan        nan           0           0
+lunar_new_year_day                        0          0        nan        nan           0           0
+mid_autumn_day                            0          0        nan        nan           0           0
+calendar_days                             0          0        nan        nan           0           0
+lead_1_lunar_new_year             4.133e+05   1.22e+06      0.340      0.737   -2.08e+06    2.91e+06
+month_sin                         -1.47e+06    1.6e+06     -0.922      0.365   -4.74e+06     1.8e+06
+month_cos                         2.683e+06   9.63e+05      2.787      0.010    7.08e+05    4.66e+06
+sales_lag_1m                         0.0396      0.105      0.375      0.710      -0.177       0.256
+sales_lag_3m                         0.0576      0.106      0.541      0.593      -0.161       0.276
+sales_lag_12m                       -0.1400      0.086     -1.623      0.116      -0.317       0.037
+sales_rolling_3m_mean               -0.3441      0.370     -0.929      0.361      -1.104       0.416
+sales_rolling_6m_mean               -0.6415      0.486     -1.321      0.198      -1.638       0.355
+==============================================================================
+Omnibus:                        0.856   Durbin-Watson:                   1.931
+Prob(Omnibus):                  0.652   Jarque-Bera (JB):                0.380
+Skew:                           0.203   Prob(JB):                        0.827
+Kurtosis:                       3.157   Cond. No.                     1.70e+18
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The smallest eigenvalue is 3.53e-21. This might indicate that there are
+strong multicollinearity problems or that the design matrix is singular.
