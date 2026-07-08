@@ -16,9 +16,41 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+class DatabaseUnavailableError(RuntimeError):
+    """SQL Server is not reachable (Docker / PosInsight likely not started)."""
+
+
+def _connection_refused(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return "10061" in msg or "actively refused" in msg or "login timeout expired" in msg
+
+
+def _db_startup_hint(server: str, database: str) -> str:
+    return (
+        f"無法連線到 SQL Server（{server} / {database}）。\n"
+        "PosInsight 資料庫可能尚未啟動，請先執行：\n"
+        "\n"
+        "  docker compose up -d\n"
+        "\n"
+        "確認容器已 healthy：\n"
+        "\n"
+        "  docker ps --filter name=pos_insight_db\n"
+        "\n"
+        "啟動完成後請重新執行本指令。"
+    )
+
+
 # ── Connection ──────────────────────────────────────────────────────────────
 
-def get_connection(server: str, database: str, user: str, password: str) -> pyodbc.Connection:
+def get_connection(
+    server: str,
+    database: str,
+    user: str,
+    password: str,
+    *,
+    timeout: int = 10,
+) -> pyodbc.Connection:
     conn_str = (
         f"DRIVER={{ODBC Driver 18 for SQL Server}};"
         f"SERVER={server};"
@@ -28,7 +60,12 @@ def get_connection(server: str, database: str, user: str, password: str) -> pyod
         "TrustServerCertificate=yes;"
         "Encrypt=yes;"
     )
-    return pyodbc.connect(conn_str, autocommit=False)
+    try:
+        return pyodbc.connect(conn_str, autocommit=False, timeout=timeout)
+    except pyodbc.OperationalError as exc:
+        if _connection_refused(exc):
+            raise DatabaseUnavailableError(_db_startup_hint(server, database)) from exc
+        raise
 
 
 # ── Store ID cache ──────────────────────────────────────────────────────────

@@ -92,7 +92,7 @@ SELECT
     store_id, store_code, store_name, store_short_name, store_type,
     customer_count, unit_price, sales_result, transfer_amount, sales_incl_result
 FROM vw_daily_store_sales
--- 視圖已含 store_type IN ('store','HQ')；不含 PDF 小計／總計列。
+-- 視圖已含 store_type IN ('BD','HQ','SR','store','Web')；不含 PDF 小計／總計列。
 -- 若只要直營店，取消下行註解：
 -- WHERE store_type = 'store'
 ORDER BY store_name, report_date;

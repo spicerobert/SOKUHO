@@ -1,0 +1,2 @@
+﻿train_range,test_year,test_month_end,best_model,val_mape_pct,test_mape_pct
+2021-2025,2026,3,XGBoost_with_macro,29.15,28.29

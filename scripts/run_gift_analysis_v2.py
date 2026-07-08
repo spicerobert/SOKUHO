@@ -85,6 +85,12 @@ LAG_FEATURES = [
     "cny_shift_signal",                 # lag_12m 含春節偏移信號
     "midautumn_shift_signal",           # lag_12m 含中秋偏移信號（前置月不調整）
     "lag_12m_cny_adj",                  # 春節調整後的 lag_12m（非春節歷史均值）
+    # 節氣強度錨定：春節偏零售、中秋偏企業採購
+    "cny_retail_intensity",
+    "midautumn_b2b_intensity",
+    "cny_x_lag1",
+    "midautumn_x_lag1",
+    "midautumn_x_lag12",
 ]
 
 # 若有真實 macro 資料可選用（目前版本 synthetic 的保留為 fallback，預設關閉）
@@ -308,6 +314,23 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
             lag12_cny_adj_list.append(float(row.get("sales_lag_12m") or 0))
     df["lag_12m_cny_adj"] = lag12_cny_adj_list
 
+    # ── 節氣強度錨定（從日期落點轉成強度）───────────────────────────────────
+    # 春節愈晚（day 愈大），通常 lead-1 月與當月拉貨更強；中秋同理，且常見企業採購放大。
+    cny_day_norm = (pd.to_numeric(df["lunar_new_year_day"], errors="coerce").fillna(0) / 31.0).clip(0, 1)
+    mid_day_norm = (pd.to_numeric(df["mid_autumn_day"], errors="coerce").fillna(0) / 30.0).clip(0, 1)
+
+    df["cny_retail_intensity"] = (
+        df["has_lunar_new_year"] * (0.6 + 0.4 * cny_day_norm)
+        + df["lead_1_lunar_new_year"] * (0.4 + 0.6 * cny_day_norm)
+    )
+    df["midautumn_b2b_intensity"] = (
+        df["has_mid_autumn"] * (0.5 + 0.5 * mid_day_norm)
+        + df["lead_1_mid_autumn"] * (0.6 + 0.4 * mid_day_norm)
+    )
+    df["cny_x_lag1"] = df["cny_retail_intensity"] * df["sales_lag_1m"].fillna(0)
+    df["midautumn_x_lag1"] = df["midautumn_b2b_intensity"] * df["sales_lag_1m"].fillna(0)
+    df["midautumn_x_lag12"] = df["midautumn_b2b_intensity"] * df["sales_lag_12m"].fillna(0)
+
     # ── 節日感知 Lag（解決節日跨月問題） ──────────────────────────────────
     # 當年中秋/春節若落在不同月份，lag_12m 會給出錯誤基線
     # 改用「前一年度同節日月份」的銷售作為額外特徵
@@ -482,10 +505,13 @@ def model_one_group(
     feats: list[str],
     out: Path,
     models_dir: Path,
+    test_year: int = 2025,
+    test_month_start: int = 1,
+    test_month_end: int = 12,
 ) -> dict:
     """
     對單一群組執行 LOYO 選模 → 最終評估。
-    回傳 {group, best_model, val_mape, test_mape_2025, pred_series}
+    回傳 {group, best_model, val_mape, test_mape_pct, pred_series}
     """
     sub = sub.sort_values("date").reset_index(drop=True)
 
@@ -496,10 +522,13 @@ def model_one_group(
         available_feats = [f for f in feats if f in sub.columns]
 
     # 可用驗證年：
-    # - 使用 2024 作為主要驗證折（與 2025 條件最相似：相同門檻 900、後疫情穩定期）
-    # - 同時加入 2023 作為穩健性折，但優先選 2024 表現良好的模型
+    # - 使用 test_year 前兩年作為主要驗證折
+    # - 若資料不足則 fallback 到可用且小於 test_year 的近年資料
     all_years = sorted(sub["report_year"].unique())
-    val_years = [y for y in all_years if y >= 2023 and y < 2025]
+    preferred = [test_year - 2, test_year - 1]
+    val_years = [y for y in preferred if y in all_years]
+    if not val_years:
+        val_years = [y for y in all_years if y >= 2023 and y < test_year]
 
     # 候選模型（強正則化，應對 60 月短樣本）
     candidates: dict[str, object] = {
@@ -630,9 +659,13 @@ def model_one_group(
     ml_rows_sorted = sorted(ml_rows, key=lambda x: x["val_mape_pct"])
     top3_labels = [r["model"] for r in ml_rows_sorted[:3]]
 
-    # ── 以 2021–2024 重新訓練最佳模型，預測 2025 ─────────────────────────
-    train_full = sub[sub["report_year"] <= 2024]
-    test_2025 = sub[sub["report_year"] == 2025]
+    # ── 以 test_year 前資料重新訓練最佳模型，預測 test_year 指定區間 ──────
+    train_full = sub[sub["report_year"] < test_year]
+    test_2025 = sub[
+        (sub["report_year"] == test_year)
+        & (sub["report_month"] >= test_month_start)
+        & (sub["report_month"] <= test_month_end)
+    ]
     y_test = pd.to_numeric(test_2025["sales_result"], errors="coerce").astype(float)
 
     # ETS 旗標在 if best_is_ets 分支中可能被未初始化，防禦性補設
@@ -851,11 +884,17 @@ def model_one_group(
             pass  # calibration 失敗不影響主流程
 
     test_mape = _safe_mape(y_test.to_numpy(), pred_2025)
-    print(f"  {group}: best={best_name}  val_mape={best_val_mape:.1f}%  test2025_mape={test_mape:.1f}%")
+    print(
+        f"  {group}: best={best_name}  val_mape={best_val_mape:.1f}%  "
+        f"test{test_year}_{test_month_start:02d}-{test_month_end:02d}_mape={test_mape:.1f}%"
+    )
     if group == "GIFT_HIGH":
         for m_idx, (actual, pred_v) in enumerate(zip(y_test.values, pred_2025)):
             month_mape = abs(actual - pred_v) / max(abs(actual), 1) * 100
-            print(f"    2025-{m_idx+1:02d}: actual={actual:,.0f}  pred={pred_v:,.0f}  err={month_mape:.1f}%")
+            print(
+                f"    {test_year}-{int(test_2025.iloc[m_idx]['report_month']):02d}: "
+                f"actual={actual:,.0f}  pred={pred_v:,.0f}  err={month_mape:.1f}%"
+            )
 
     # 預測圖
     if len(test_2025):
@@ -872,7 +911,7 @@ def model_one_group(
         "group": group,
         "model": best_name,
         "val_mape_pct": best_val_mape,
-        "test_mape_2025_pct": test_mape,
+        "test_mape_pct": test_mape,
         "pred_series": pred_2025,
         "test_dates": test_2025["date"].values,
         "compare_rows": compare_rows,
@@ -885,11 +924,19 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Gift 分析 v2")
     p.add_argument("--from-csv", action="store_true", help="從 CSV 讀取（不需 DB 連線）")
     p.add_argument("--data-csv", default="data/gift_analysis_dataset.csv", help="CSV 路徑")
+    p.add_argument("--test-year", type=int, default=2025, help="回測年度（預設 2025）")
+    p.add_argument("--test-month-start", type=int, default=1, help="回測起始月份（1-12）")
+    p.add_argument("--test-month-end", type=int, default=12, help="回測結束月份（1-12）")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if not (1 <= args.test_month_start <= 12 and 1 <= args.test_month_end <= 12):
+        raise ValueError("test-month-start / test-month-end 必須介於 1~12")
+    if args.test_month_start > args.test_month_end:
+        raise ValueError("test-month-start 不可大於 test-month-end")
+
     out = Path("outputs")
     models_dir = Path("models")
     out.mkdir(exist_ok=True)
@@ -909,12 +956,17 @@ def main() -> None:
     for g in GROUPS:
         sub = df[df["canonical_group"] == g].copy()
         print(f"\n[{g}]")
-        res = model_one_group(sub, g, ALL_FEATURES, out, models_dir)
+        res = model_one_group(
+            sub, g, ALL_FEATURES, out, models_dir,
+            test_year=args.test_year,
+            test_month_start=args.test_month_start,
+            test_month_end=args.test_month_end,
+        )
         all_compare.extend(res["compare_rows"])
         group_preds[g] = res["pred_series"]
         group_test_dates[g] = res["test_dates"]
         if g == "GIFT_COMBINED":
-            direct_comb_mape = res["test_mape_2025_pct"]
+            direct_comb_mape = res["test_mape_pct"]
             # 先暫存 direct result，待 bottom-up 比較後決定最終
             direct_comb_res = res
         else:
@@ -922,7 +974,7 @@ def main() -> None:
                 "group": res["group"],
                 "model": res["model"],
                 "val_mape_loyo_pct": round(res["val_mape_pct"], 2),
-                "test_mape_2025_pct": round(res["test_mape_2025_pct"], 2),
+                "test_mape_pct": round(res["test_mape_pct"], 2),
             })
 
     # ── GIFT_COMBINED：bottom-up vs direct，取較佳者 ─────────────────────────
@@ -931,7 +983,11 @@ def main() -> None:
     high_pred = group_preds.get("GIFT_HIGH")
 
     sub_comb = df[df["canonical_group"] == "GIFT_COMBINED"].copy()
-    test_comb = sub_comb[sub_comb["report_year"] == 2025].sort_values("date")
+    test_comb = sub_comb[
+        (sub_comb["report_year"] == args.test_year)
+        & (sub_comb["report_month"] >= args.test_month_start)
+        & (sub_comb["report_month"] <= args.test_month_end)
+    ].sort_values("date")
     y_comb_actual = pd.to_numeric(test_comb["sales_result"], errors="coerce").astype(float)
 
     if low_pred is not None and high_pred is not None and len(low_pred) == len(high_pred):
@@ -972,7 +1028,7 @@ def main() -> None:
         "group": "GIFT_COMBINED",
         "model": final_comb_method,
         "val_mape_loyo_pct": final_comb_val,
-        "test_mape_2025_pct": round(final_comb_mape, 2) if np.isfinite(final_comb_mape) else None,
+        "test_mape_pct": round(final_comb_mape, 2) if np.isfinite(final_comb_mape) else None,
     })
 
     # ── 輸出 ──────────────────────────────────────────────────────────────────
@@ -991,7 +1047,7 @@ def main() -> None:
     TARGETS = {"GIFT_LOW": 20.0, "GIFT_HIGH": 18.0, "GIFT_LARGE": 25.0, "GIFT_COMBINED": 15.0}
     for row in results:
         v1 = v1_mape.get(row["group"], float("nan"))
-        v2 = row["test_mape_2025_pct"]
+        v2 = row["test_mape_pct"]
         tgt = TARGETS.get(row["group"], float("nan"))
         if v2 is None:
             v2_str = "  N/A"

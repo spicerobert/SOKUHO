@@ -120,7 +120,7 @@ GO
 -- VIEWS for PowerBI
 -- ============================================================
 
--- Daily sales：store、HQ（排除 subtotal / grand_total；區域小計與總計在 Power BI 聚合）
+-- Daily sales：store/BD/HQ/SR/Web（排除 subtotal / grand_total；區域小計與總計在 Power BI 聚合）
 CREATE OR ALTER VIEW vw_daily_store_sales AS
 SELECT
     fs.report_date,
@@ -141,7 +141,7 @@ SELECT
 FROM fact_sales        fs
 JOIN dim_store         ds ON ds.store_id = fs.store_id
 WHERE fs.record_type = 'DAILY'
-  AND ds.store_type IN ('store', 'HQ');
+  AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web');
 GO
 
 -- Grand total summary by day (for KPI cards)
@@ -185,7 +185,7 @@ daily_month_sum AS (
     FROM fact_sales fs
     JOIN dim_store ds ON ds.store_id = fs.store_id
     WHERE RTRIM(fs.record_type) = 'DAILY'
-      AND ds.store_type IN ('store', 'HQ')
+      AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web')
     GROUP BY YEAR(fs.report_date), MONTH(fs.report_date)
 )
 SELECT

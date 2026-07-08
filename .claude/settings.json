@@ -3,7 +3,30 @@
     "allow": [
       "Read(//e/OneDrive - Aunt Stella Company/KOUSEIHI/**)",
       "Bash(uv run *)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "WebFetch(domain:www.stat.gov.tw)",
+      "WebFetch(domain:nstatdb.dgbas.gov.tw)",
+      "WebFetch(domain:dmz26.moea.gov.tw)",
+      "WebFetch(domain:www.dgbas.gov.tw)",
+      "WebFetch(domain:data.gov.tw)",
+      "WebFetch(domain:cpx.cbc.gov.tw)",
+      "WebFetch(domain:fred.stlouisfed.org)",
+      "WebFetch(domain:api.stlouisfed.org)",
+      "WebFetch(domain:cci.nccu.edu.tw)",
+      "WebFetch(domain:www.mof.gov.tw)",
+      "WebFetch(domain:easystat.dgbas.gov.tw)",
+      "WebFetch(domain:www.tourism.gov.tw)",
+      "WebFetch(domain:admin.taiwan.net.tw)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/fetch_macro_real.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/load_macro.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/_probe_sites.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/_probe2.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/_probe3.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/_get_moea_excel.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/_probe_cdri.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/scrape_dept_store_ndc.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/scrape_final.py 2>&1)",
+      "PowerShell(cd \"e:\\\\Git\\\\SOKUHO\"; $env:PYTHONIOENCODING=\"utf-8\"; uv run python scripts/scrape_ndc_api.py 2>&1)"
     ]
   }
 }

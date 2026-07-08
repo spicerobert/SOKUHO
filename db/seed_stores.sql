@@ -70,6 +70,7 @@ USING (
     (N'4008', N'Anhe store',            N'Anhe',  N'store',          36),
     (N'4011', N'Business Development',  N'BD',    N'BD',          37),
     (N'4003', N'China Airlines',         N'China Air', N'BD',      38),
+    (N'4004', N'Duty Free',              N'BD',    N'BD',          39),
     (N'9013', N'OFFICE & WEB TOTAL',      N'OFFWEB_SUB', N'subtotal', 33),
     (N'9999', N'GRAND TOTAL',             N'GRAND', N'grand_total', 34)
 ) AS s (store_code, store_name, store_short_name, store_type, display_order)

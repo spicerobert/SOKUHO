@@ -55,3 +55,9 @@ overrides:
     use_basename: "SOKUHO 2026.04.08(Revised).pdf"
     instead_of_basename: "SOKUHO 2026.04.08.pdf"
     note: "以 Revised 版為正式匯入來源"
+
+  "2026-04-28":
+    use_basename: "SOKUHO 2026.04.28 new.pdf"
+    instead_of_basename: "SOKUHO 2026.04.28.pdf"
+    path_contains: "202604"
+    note: "原標準檔已移除，改採 new 版為正式匯入來源"
