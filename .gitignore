@@ -147,6 +147,10 @@ celerybeat.pid
 env/
 venv/
 ENV/
+
+# Google OAuth 憑證與 token（Gmail API 存取用，見 auth/credentials.json）
+auth/credentials.json
+auth/token.json
 env.bak/
 venv.bak/
 

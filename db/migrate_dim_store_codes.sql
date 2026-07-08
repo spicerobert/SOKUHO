@@ -14,7 +14,7 @@ IF COL_LENGTH('dim_store', 'store_short_name') IS NULL
     ALTER TABLE dim_store ADD store_short_name NVARCHAR(30) NULL;
 GO
 
--- Daily sales：store、HQ（排除 subtotal / grand_total）
+-- Daily sales：store/BD/HQ/SR/Web（排除 subtotal / grand_total）
 CREATE OR ALTER VIEW vw_daily_store_sales AS
 SELECT
     fs.report_date,
@@ -35,7 +35,7 @@ SELECT
 FROM fact_sales        fs
 JOIN dim_store         ds ON ds.store_id = fs.store_id
 WHERE fs.record_type = 'DAILY'
-  AND ds.store_type IN ('store', 'HQ');
+  AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web');
 GO
 
 IF OBJECT_ID('vw_mtd_store_sales', 'V') IS NOT NULL

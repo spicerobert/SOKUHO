@@ -29,6 +29,11 @@ uv run python main.py --from-date 2026-03-01 --to-date 2026-03-31
 uv run python main.py --from-date 2026-03-01 --to-date 2026-03-31 --force
 uv run python main.py --from-date 2026-03-01 --to-date 2026-03-31 --dry-run
 
+# SOKUHO Gmail 同步（Gmail 搜尋 → 下載附件 → 匯入，一行指令）
+uv run python scripts/sync_and_import_sokuho.py              # 以 DB 最後 report_date 增量搜尋
+uv run python scripts/sync_and_import_sokuho.py --dry-run    # 只下載附件，不寫入 DB
+uv run python scripts/sync_and_import_sokuho.py --since 2026-01-01  # 手動覆寫增量基準日期
+
 # KOUSEIHI ETL（尚在開發，SDD 詳見 docs/SDD_KOUSEIHI_AND_ANALYSIS.md）
 uv run python main_kouseihi.py               # 全量跑 5 年
 uv run python main_kouseihi.py --force       # 強制重跑
@@ -87,7 +92,11 @@ PowerBI Views：`vw_daily_store_sales`、`vw_daily_grand_total`、`vw_month_end_
 
 ### 資料來源
 
-年度 PDF：`YYYYMM-KOUSEIHI Company.pdf`（MM 固定為 12，年度彙總）。2021~2025 年共 5 份。
+年度 PDF：`YYYYMM-KOUSEIHI Company.pdf`（預設 MM 固定為 12，年度彙總）。2021~2025 年共 5 份。
+
+臨時例外（2026-03）：
+- `E:\OneDrive - Aunt Stella Company\KOUSEIHI\202603-KOUSEIHI Company.pdf`
+- 用途：先行補入 2026 年 3 月版本，作為短期分析/驗證資料
 
 每份 PDF 包含：
 - 8 商品類別 × 15 時期 = 120 筆 category 記錄
@@ -210,7 +219,7 @@ outputs/v2_*.csv / outputs/v2_*.png
 
 GIFT_HIGH 23.99% 無法進一步改善的結構性限制：
 
-1. **2025 離峰月系統性低於 2024**（Mar-Aug，低 15-45%）：所有 macro 指標為 `synthetic_baseline_v1`（合成假資料），無真實消費信心/百貨業 YoY 可用
+1. **2025 離峰月系統性低於 2024**（Mar-Aug，低 15-45%）：`cci` 仍為近似值（NCCU 全站下線）；`dept_store_yoy` 2021-2024/03 為近似值（MOEA EE520 需登入）；2024/04 起已有真實 MOEA 月報數據
 2. **CNY 跨月極端案例**：Feb 2025 lag_12m = Feb 2024（CNY）= 7.37M，但實際 1.98M（-73%）；訓練資料中僅 1 個類似案例（Feb 2023，僅 -9%）
 3. **零訓練案例**：2021-2024 年中秋均在 9 月；2025 年中秋在 10/6，Sep 成「前置備貨月」——此特徵組合從未出現在訓練資料中
 
@@ -225,7 +234,7 @@ GIFT_HIGH 23.99% 無法進一步改善的結構性限制：
 | GIFT_HIGH lag_12m 污染 | GIFT_HIGH 使用專屬特徵集，移除 `sales_lag_12m`、`trend_yoy_adj`、`yoy_estimate`、`comp_x_lag12` |
 | Feb CNY 跨月 | 新增 `lag_12m_cny_adj`（用歷史非春節同月均值取代被污染的 lag_12m） |
 | 中秋前置月誤判 | `lead_1_mid_autumn=1` 時強制 `midautumn_shift_signal=0`（不向下調整） |
-| 合成 macro 無效 | `REAL_MACRO_FEATURES = []`（預設停用），待真實資料再加入 |
+| 合成 macro 無效 | `REAL_MACRO_FEATURES = []`（預設停用）；`bsi`/`dept_store_yoy`/`retail_trade_yoy` 已有部分真實資料，可考慮重新測試 |
 
 ### 輸出檔案
 
@@ -255,7 +264,7 @@ GIFT_HIGH 23.99% 無法進一步改善的結構性限制：
 | `gram_cookies_sales` / `fb_sales` | 餅乾 / 餐飲銷售 |
 | `customer_count` / `unit_price` | 客數 / 客單價 |
 | `has_lunar_new_year` / `has_mid_autumn` | 節日旗標 |
-| macro 指標（14 欄） | 全為 `synthetic_baseline_v1`，目前無預測效力 |
+| macro 指標（14 欄） | `bsi`/`dept_store_yoy`/`retail_trade_yoy` 2024-04+ 已更新真實數據；其餘為近似值或代理指標 |
 
 **重要業務規律**（可從資料直接觀察）：
 
@@ -269,7 +278,20 @@ GIFT_HIGH 23.99% 無法進一步改善的結構性限制：
 ## 五、開發注意事項
 
 - **Python 環境**：一律用 `uv`，絕不直接 `pip install`
-- **合成 macro 資料**：`data/macro_raw/*.csv` 全部為合成假資料，不可用於真實預測
+- **SOKUHO Gmail 自動同步**（`scripts/sync_and_import_sokuho.py`）：
+  - `auth/credentials.json` 是 Gmail API OAuth（installed-app，project `pipeline-499103`），`auth/token.json` 為授權後快取的 refresh token；兩者皆已加入 `.gitignore`，不可提交
+  - 增量策略：先查 `fact_sales` 的 `MAX(report_date)` 當作基準，Gmail 搜尋只用 `after:<基準日>` 縮小範圍（不掃全信箱），信件條件為 `from:bellecheng@auntstella.com.tw subject:SOKUHO has:attachment`（實際寄件人是 Belle 鄭，robert@ 信箱只是收件方；認證登入的帳號仍是 robert@auntstella.com.tw）
+  - 主旨可能是日期範圍（如 `SOKUHO 2026.07.03-07.05`），但**附件檔名仍是逐日拆開**的 `SOKUHO YYYY.MM.DD.pdf`（一封信可能有多個附件），下載邏輯是逐一附件解析日期，不受主旨格式影響；下載後依 `parse_date_from_filename` 分類到 `PDF_DIR\<year>\<yyyymm>\`（沿用既有資料夾慣例，如 `2026\202607\`），本機已存在的檔名會跳過不重複下載
+  - 下載完成後自動呼叫 `main.py --from-date --to-date` 匯入新範圍，等同「搜尋→下載→分類→匯入」一行指令
+- **macro 資料品質**（2026-05 更新）：
+  - **真實資料**：`cpi_total/food`, `unemployment`, `twd_usd/jpy`, `inbound_tourists`（主計總處/央行）；`bsi`（NDC 景氣對策信號 9-45分，60/60筆）；`dept_store_yoy`/`retail_trade_yoy`（2024/04-2025/12 MOEA 月報真實值）
+  - **近似值**：`cci`（NCCU 網站 DNS 不存在，無存檔）；`dept_store_yoy` 2021-2024/03（MOEA EE520 查詢系統需登入）；`avg_wage_yoy`、`dept_store_sales`（趨勢近似）
+  - **代理指標**：`gift_market_sentiment`（dept_yoy 正規化）；`stock_wealth_effect`（TAIEX YoY 近似）
+  - **重大改進（2026-05）**：`retail_trade_yoy` 2025/04-12 從 MOEA EE521 Highcharts API 取得真實值；`bsi` 完整 60 筆 NDC 景氣對策信號；`dept_store_yoy` 2024/04+ 從 MOEA 月報 regex 提取
+  - **EE521 系統**：`https://service.moea.gov.tw/EE521/visualize/VisDashboard.aspx?d=2`（零售業），Highcharts 物件可用 `Highcharts.charts[0].series` 直接提取
+  - **百貨公司細目**：僅存於 MOEA EE520（需登入）和月報文字；EE521 只有整體零售業
+  - 更新腳本：`scripts/scrape_final.py`（MOEA bulletin + Highcharts）、`scripts/fetch_ndc_full.py`（NDC BSI）
+  - 重跑指令：`uv run python scripts/scrape_final.py` → `uv run python scripts/scrape_highcharts.py`（若需重建 Highcharts）→ `uv run python scripts/load_macro.py`
 - **MAPE 真實值**：永遠查 `outputs/mape_summary.csv`，不要信任 `docs/analysis_report.md` 內的舊版數字（可能人工編輯過）
 - **v1 vs v2**：`scripts/run_gift_analysis.py` 為課程 agent 版（v1，保留備查）；正式版為 `scripts/run_gift_analysis_v2.py`
 - **Bottom-up 優先**：GIFT_COMBINED 預測永遠用 LOW_pred + HIGH_pred，直接建模效果差很多（22.6% vs 13.6%）

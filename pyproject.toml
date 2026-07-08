@@ -18,6 +18,12 @@ dependencies = [
     "joblib>=1.4.0",
     "lunardate>=0.2.2",
     "xgboost>=3.2.0",
+    "openpyxl>=3.1.5",
+    "playwright>=1.60.0",
+    "xlrd>=2.0.2",
+    "google-api-python-client>=2.198.0",
+    "google-auth-httplib2>=0.4.0",
+    "google-auth-oauthlib>=1.4.0",
 ]
 
 [build-system]
