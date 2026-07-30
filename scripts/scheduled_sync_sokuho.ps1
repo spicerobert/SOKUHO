@@ -43,10 +43,16 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 Set-Location $ProjectRoot
 $env:PYTHONIOENCODING = "utf-8"
 $env:Path = "D:\Python\Scripts;D:\Docker\resources\bin;" + $env:Path
+# 強制公司 Gmail / Edge 設定檔，避免排程重授權時開到個人設定檔。
+# 換機時請先查 Local State 對應 robert@auntstella.com.tw 的 Folder，再改 EDGE_PROFILE_DIR。
+$env:GMAIL_LOGIN_HINT = if ($env:GMAIL_LOGIN_HINT) { $env:GMAIL_LOGIN_HINT } else { "robert@auntstella.com.tw" }
+$env:EDGE_PROFILE_DIR = if ($env:EDGE_PROFILE_DIR) { $env:EDGE_PROFILE_DIR } else { "Profile 1" }
+$env:NOTIFY_EMAIL = if ($env:NOTIFY_EMAIL) { $env:NOTIFY_EMAIL } else { "robert@auntstella.com.tw" }
 # 讓 PowerShell 以 UTF-8 解碼子程序（python/docker）輸出，避免中文在 log 變亂碼。
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 Write-Log "=== SOKUHO scheduled sync started ==="
+Write-Log ("Gmail hint={0}; Edge profile={1}" -f $env:GMAIL_LOGIN_HINT, $env:EDGE_PROFILE_DIR)
 
 $exitCode = 0
 $errorMsg = $null

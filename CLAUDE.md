@@ -280,9 +280,9 @@ GIFT_HIGH 23.99% 無法進一步改善的結構性限制：
 - **Python 環境**：一律用 `uv`，絕不直接 `pip install`
 - **SOKUHO Gmail 自動同步**（`scripts/sync_and_import_sokuho.py`）：
   - `auth/credentials.json` 是 Gmail API OAuth（installed-app，project `pipeline-499103`），`auth/token.json` 為授權後快取的 refresh token；兩者皆已加入 `.gitignore`，不可提交
-  - 增量策略：先查 `fact_sales` 的 `MAX(report_date)` 當作基準，Gmail 搜尋只用 `after:<基準日>` 縮小範圍（不掃全信箱），信件條件為 `from:bellecheng@auntstella.com.tw subject:SOKUHO has:attachment`（實際寄件人是 Belle 鄭，robert@ 信箱只是收件方；認證登入的帳號仍是 robert@auntstella.com.tw）
-  - 主旨可能是日期範圍（如 `SOKUHO 2026.07.03-07.05`），但**附件檔名仍是逐日拆開**的 `SOKUHO YYYY.MM.DD.pdf`（一封信可能有多個附件），下載邏輯是逐一附件解析日期，不受主旨格式影響；下載後依 `parse_date_from_filename` 分類到 `PDF_DIR\<year>\<yyyymm>\`（沿用既有資料夾慣例，如 `2026\202607\`），本機已存在的檔名會跳過不重複下載
-  - 下載完成後自動呼叫 `main.py --from-date --to-date` 匯入新範圍，等同「搜尋→下載→分類→匯入」一行指令
+  - 增量策略：先查 `fact_sales` 的 `MAX(report_date)` 當作基準，Gmail 搜尋只用 `after:<基準日>` 縮小範圍（不掃全信箱）。信件條件為 `(from:bellecheng@ OR from:mantsu@ OR from:billy@) subject:SOKUHO has:attachment filename:SOKUHO`（可用環境變數 `SOKUHO_GMAIL_SENDERS` 覆寫）。收件／OAuth 帳號仍是 `robert@auntstella.com.tw`；代班時寄件人常是 `mantsu@`（若只搜 bellecheng 會漏抓範圍主旨那批）
+  - 主旨可能是單日或日期範圍（如 `SOKUHO 2026.07.03-07.05`、`SOKUHO 2026.06.18~2026.06.21`、`SOKUHO 2026.07.24~2026.7.26`），但**附件檔名仍是逐日拆開**的 `SOKUHO YYYY.MM.DD.pdf`（一封信可能有多個附件），下載邏輯遞迴走 MIME、逐一附件解析日期，不受主旨格式影響；下載後依 `parse_date_from_filename` 分類到 `PDF_DIR\<year>\<yyyymm>\`（沿用既有資料夾慣例，如 `2026\202607\`），本機已存在的檔名會跳過不重複下載
+  - 下載完成後自動呼叫 `main.py --from-date --to-date` 匯入新範圍，等同「搜尋→下載→分類→匯入」一行指令。若曾漏抓，用 `--since <缺口前一日>` 回補（增量預設不會往回看）
 - **macro 資料品質**（2026-05 更新）：
   - **真實資料**：`cpi_total/food`, `unemployment`, `twd_usd/jpy`, `inbound_tourists`（主計總處/央行）；`bsi`（NDC 景氣對策信號 9-45分，60/60筆）；`dept_store_yoy`/`retail_trade_yoy`（2024/04-2025/12 MOEA 月報真實值）
   - **近似值**：`cci`（NCCU 網站 DNS 不存在，無存檔）；`dept_store_yoy` 2021-2024/03（MOEA EE520 查詢系統需登入）；`avg_wage_yoy`、`dept_store_sales`（趨勢近似）

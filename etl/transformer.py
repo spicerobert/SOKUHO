@@ -26,6 +26,7 @@ EXPECTED_STORE_NAMES = {
     "A8 Mitsukoshi", "Gloria Outlets",
     "Business Development",
     "China Airlines",
+    "Duty Free",
     "Taoyuan Area", "Hsinchu Area", "Taichung Area", "Tainan Area", "Kaohsiung Area",
     "OFFICE & WEB TOTAL", "GRAND TOTAL",
 }

@@ -4,8 +4,12 @@ Gmail → OneDrive → SQL Server 一條龍同步。
 
 1. 查 DB 取得 fact_sales 最後已匯入的 report_date（增量基準）。
 2. 用該日期組出 Gmail 搜尋範圍（after:YYYY/MM/DD），只掃描新信件，不做全信箱搜尋。
-3. 下載主旨符合 "SOKUHO YYYY.MM.DD" 的 PDF 附件到 PDF_DIR\<year>\<yyyymm>\（沿用既有資料夾慣例，已存在的檔案跳過）。
+3. 下載主旨含 SOKUHO 的 PDF 附件到 PDF_DIR\<year>\<yyyymm>\（沿用既有資料夾慣例，已存在的檔案跳過）。
+   主旨可為單日（SOKUHO YYYY.MM.DD）或範圍（SOKUHO YYYY.MM.DD~YYYY.MM.DD / YYYY.MM.DD-MM.DD）；
+   附件檔名仍是逐日拆開的 SOKUHO YYYY.MM.DD.pdf。
 4. 呼叫 main.py 匯入新下載範圍內的日期。
+
+寄件者不只 bellecheng：代班時可能是 mantsu@ / billy@ 等（見 SOKUHO_GMAIL_SENDERS）。
 
 首次執行會開瀏覽器要求用 robert@auntstella.com.tw 登入 Google 授權一次；
 之後 token 快取在 auth/token.json，不需要再登入。
@@ -28,13 +32,10 @@ from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from etl import loader as db
+from etl.gmail_auth import get_gmail_service
 from etl.pdf_parser import parse_date_from_filename
 
 logging.basicConfig(
@@ -44,20 +45,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-AUTH_DIR = Path(__file__).resolve().parent.parent / "auth"
-CREDENTIALS_PATH = AUTH_DIR / "credentials.json"
-TOKEN_PATH = AUTH_DIR / "token.json"
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-
-GMAIL_SENDER = "bellecheng@auntstella.com.tw"
+# 正常寄件人 + 代班寄件人。可用環境變數 SOKUHO_GMAIL_SENDERS（逗號分隔）覆寫。
+_DEFAULT_SENDERS = (
+    "bellecheng@auntstella.com.tw,"
+    "mantsu@auntstella.com.tw,"
+    "billy@auntstella.com.tw"
+)
 GMAIL_SUBJECT_KEYWORD = "SOKUHO"
 
 DEFAULT_PDF_DIR = r"E:\OneDrive - Aunt Stella Company\SOKUHO"
 
 
+def gmail_senders() -> list[str]:
+    raw = os.environ.get("SOKUHO_GMAIL_SENDERS", _DEFAULT_SENDERS)
+    return [s.strip().lower() for s in raw.split(",") if s.strip()]
+
+
+def gmail_from_clause(senders: list[str]) -> str:
+    """Build Gmail `from:` clause; OR-group when multiple senders."""
+    if not senders:
+        raise ValueError("SOKUHO_GMAIL_SENDERS 不可為空")
+    if len(senders) == 1:
+        return f"from:{senders[0]}"
+    return "(" + " OR ".join(f"from:{s}" for s in senders) + ")"
+
+
 def require_database() -> None:
     """Fail fast with a clear hint when Docker / PosInsight is not running."""
-    try:
+    from etl.docker_db import ensure_posinsight_running
+
+    def _ping() -> None:
         conn = db.get_connection(
             server=os.environ["DB_SERVER"],
             database=os.environ["DB_NAME"],
@@ -65,23 +82,24 @@ def require_database() -> None:
             password=os.environ["DB_PASSWORD"],
         )
         conn.close()
-    except db.DatabaseUnavailableError as exc:
-        logger.error("%s", exc)
-        sys.exit(1)
 
-
-def get_gmail_service():
-    creds: Credentials | None = None
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_PATH), SCOPES)
-            creds = flow.run_local_server(port=0)
-        TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
-    return build("gmail", "v1", credentials=creds)
+    try:
+        _ping()
+    except db.DatabaseUnavailableError:
+        logger.info("資料庫未連線，嘗試自動啟動 Docker / PosInsight …")
+        try:
+            ensure_posinsight_running()
+            _ping()
+        except (RuntimeError, subprocess.CalledProcessError) as exc:
+            logger.error("自動啟動資料庫失敗：%s", exc)
+            logger.error(
+                "請手動執行：docker compose up -d\n"
+                "並確認 Docker Desktop 已啟動。"
+            )
+            sys.exit(1)
+        except db.DatabaseUnavailableError as exc:
+            logger.error("%s", exc)
+            sys.exit(1)
 
 
 def get_last_imported_date(conn) -> date | None:
@@ -92,11 +110,17 @@ def get_last_imported_date(conn) -> date | None:
 
 
 def list_sokuho_messages(service, since: date) -> list[dict]:
-    """Search only messages received on/after `since` (incremental, not full-mailbox)."""
+    """Search only messages received on/after `since` (incremental, not full-mailbox).
+
+    Subject may be a single day or a multi-day range (``~`` / ``-``); filtering is by
+    keyword SOKUHO + known senders, not by exact single-date subject shape.
+    """
+    senders = gmail_senders()
     query = (
-        f'from:{GMAIL_SENDER} subject:{GMAIL_SUBJECT_KEYWORD} has:attachment '
-        f'after:{since.strftime("%Y/%m/%d")}'
+        f'{gmail_from_clause(senders)} subject:{GMAIL_SUBJECT_KEYWORD} '
+        f'has:attachment filename:SOKUHO after:{since.strftime("%Y/%m/%d")}'
     )
+    logger.info("Gmail senders: %s", ", ".join(senders))
     logger.info("Gmail query: %s", query)
     messages: list[dict] = []
     page_token = None
@@ -111,6 +135,13 @@ def list_sokuho_messages(service, since: date) -> list[dict]:
     return messages
 
 
+def _iter_parts(payload: dict):
+    """Yield MIME parts depth-first (handles multipart/related nesting)."""
+    yield payload
+    for child in payload.get("parts") or []:
+        yield from _iter_parts(child)
+
+
 def download_attachments(service, messages: list[dict], pdf_dir: Path) -> set[date]:
     """Download new PDF attachments; return report_dates found (downloaded now or already on disk).
 
@@ -121,9 +152,11 @@ def download_attachments(service, messages: list[dict], pdf_dir: Path) -> set[da
     found_dates: set[date] = set()
     for meta in messages:
         msg = service.users().messages().get(userId="me", id=meta["id"], format="full").execute()
-        for part in msg.get("payload", {}).get("parts", []) or []:
+        for part in _iter_parts(msg.get("payload", {}) or {}):
             filename = part.get("filename") or ""
             if not filename.lower().endswith(".pdf"):
+                continue
+            if "SOKUHO" not in filename.upper():
                 continue
             report_date = parse_date_from_filename(filename)
             if report_date is None:
