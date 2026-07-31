@@ -62,14 +62,15 @@ PDF 檔案 → pdf_parser.py → transformer.py → loader.py → SQL Server
               parse_pdf()   records_to_dataframe()  load_file()
 ```
 
-### PDF 格式偵測（四種格式）
+### PDF 格式偵測（五種格式）
 
 | 格式 | Page 1 門市數 | Page 2 門市數 | 適用時期 |
 |------|-------------|-------------|---------|
 | A | 17 | 10 | 10 月 |
 | B | 17 | 8  | 11/1–5 |
 | D | 17 | 11 | 11/6–10 |
-| C | 19 | 9  | 11/11+ |
+| C | 19 | 9  | 11/11+（CL SOGO B1、Taichung Mitsukoshi 上移 page 1） |
+| E | 20 | 11 | 2026-05+（Tian-Mu Mitsukoshi、Hanshin Kaohsiung 上移 page 1；page 2 為 Costco/Anhe/BD 通路） |
 
 ### 資料庫結構
 

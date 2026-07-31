@@ -5,7 +5,7 @@ Each PDF (2 pages) encodes two rows per store:
   Row 1 → DAILY  : single-day figures
   Row 2 → MTD    : month-to-date cumulative
 
-Four PDF formats are handled (detected by row-count):
+Five PDF formats are handled (detected by row-count):
 
   Format A  (Oct)        : page1=17 stores, page2=10 stores
   Format B  (Nov 1-5)    : page1=17 stores, page2=8  stores  (no OFFICE/GRAND)
@@ -13,6 +13,11 @@ Four PDF formats are handled (detected by row-count):
   Format C  (Nov 11+)    : page1=19 stores, page2=9  stores  (CL SOGO B1 &
                                                                Taichung Mitsukoshi
                                                                moved to page 1)
+  Format E  (2026-05+)   : page1=20 stores, page2=11 stores  (Tian-Mu Mitsukoshi
+                                                               + Hanshin Kaohsiung
+                                                               on page 1; Costco /
+                                                               Anhe / BD channels
+                                                               on page 2)
 
 Column layout (0-indexed; NAME at col 0):
   0  NAME
@@ -135,12 +140,53 @@ _P2_C = [
     "GRAND TOTAL",
 ]  # 9 stores → 18 rows
 
+# Page 1 – format E (2026-05+): Tian-Mu Mitsukoshi + Hanshin Kaohsiung promoted;
+# CS Far Eastern / Far Eastern A13 / New Store Sales no longer listed.
+_P1_v3 = [
+    "A4 Mitsukoshi",
+    "Ban-Ciao Far Eastern",
+    "BR4 Fuxing SOGO",
+    "Nan-Shi Mitsukoshi",
+    "Takashimaya",
+    "Tian-Mu Sogo",
+    "Zhong-Xiao Sogo",
+    "Breeze Nanjing",
+    "Tian-Mu Mitsukoshi",
+    "Taipei Area",
+    "CL SOGO B1",
+    "Dome Hanshin",
+    "Hsin-Chu Big City",
+    "Hanshin Kaohsiung",
+    "Taichung Mitsukoshi",
+    "Taichung Far Eastern",
+    "Kaohsiung Sogo",
+    "Tainan Mitsukoshi",
+    "Non-Taipei Area",
+    "Existing Store Sales",
+]  # 20 stores → 40 rows
+
+# Page 2 – format E: BD / specialty channels; Costco↔Anhe order may swap in PDF
+_P2_E = [
+    "ALL 18 STORES",
+    "Costco",
+    "Anhe store",
+    "Webshop",
+    "Showroom",
+    "China Airlines",
+    "Duty Free",
+    "Taiwan High Speed Rail",
+    "Business Development",
+    "OFFICE & WEB TOTAL",
+    "GRAND TOTAL",
+]  # 11 stores → 22 rows
+
 # Map: (page1_store_count, page2_store_count) → (p1_list, p2_list, format_label)
 _FORMAT_TABLE = [
     (17, 10, _P1_v1, _P2_A, "A"),
     (17,  8, _P1_v1, _P2_B, "B"),
     (17, 11, _P1_v1, _P2_D, "D"),
     (19,  9, _P1_v2, _P2_C, "C"),
+    (20, 11, _P1_v3, _P2_E, "E"),
 ]
 
 # ── Table extraction settings ───────────────────────────────────────────────

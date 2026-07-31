@@ -6,7 +6,7 @@
 -- 未標地區的 PDF 列（Non-Taipei、Existing、New、ALL 18、Online、GRAND 等）
 -- 排在最後，方便你之後再分類。
 --
--- 天母：PDF 為 Tian-Mu Sogo → 1043、TM（ETL 對應）；另列 ERP 全名 Tian-Mu Mitsukoshi → 1075、TMMK（PDF 無此字串，無 fact）。
+-- 天母：Tian-Mu Sogo → 1043、TM；Tian-Mu Mitsukoshi → 1075、TMMK（2026-05+ Format E 起 PDF 亦有此列）。
 -- Dome Hanshin：1041 DOME；高雄區：1042 Kaohsiung Sogo KS、1003 Hanshin Kaohsiung HS、9105 Kaohsiung Area 小計。
 --
 -- 地區小計代號 9101–9105 為暫用，可日後換成 ERP 正式碼。
