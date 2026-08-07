@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-"""Send SOKUHO sync result email (success, warnings, or failure)."""
+"""Send SOKUHO sync result email only on failure or real anomalies.
+
+Quiet on clean success (no mail when sync OK with no warnings).
+"""
 
 from __future__ import annotations
 
@@ -25,18 +28,37 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_NOTIFY_EMAIL = "robert@auntstella.com.tw"
+# Match real log issues only. Do NOT match INFO lines like
+# "Unknown store policy: skip_row" or "Failed files: 0".
 WARN_PATTERNS = re.compile(
-    r"WARNING|ERROR|Unknown store|Skipping unknown|SKIPPED DAY|FAILED|失敗|警告",
+    r"("
+    r"\bWARNING\b|"
+    r"\bERROR\b|"
+    r"Unknown store names|"
+    r"Unknown stores\b|"
+    r"Skipping unknown|"
+    r"SKIPPED DAY|"
+    r"Failed files:\s*[1-9]|"
+    r"\bFAILED\b(?!\s*files:\s*0)|"
+    r"失敗"
+    r")",
     re.IGNORECASE,
 )
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Send SOKUHO sync notification email")
+    p = argparse.ArgumentParser(
+        description="Send SOKUHO sync notification email (failure/anomaly only)"
+    )
     p.add_argument("--exit-code", type=int, required=True)
     p.add_argument("--log-file", type=str, default=None)
     p.add_argument("--error-message", type=str, default=None)
     p.add_argument("--lookback-minutes", type=int, default=60)
+    p.add_argument(
+        "--force-send",
+        action="store_true",
+        help="Send even on clean success (for manual re-auth / dry checks).",
+    )
     return p.parse_args()
 
 
@@ -83,15 +105,38 @@ def _fetch_max_report_date(conn):
     return row[0] if row and row[0] else None
 
 
+def _etl_issues(etl_rows: list[dict]) -> list[dict]:
+    """FAILED / SKIPPED, or SUCCESS that still noted unknown stores."""
+    return [
+        r
+        for r in etl_rows
+        if r["status"] in ("FAILED", "SKIPPED") or r["error_message"]
+    ]
+
+
+def _needs_notification(
+    exit_code: int,
+    etl_rows: list[dict],
+    log_warnings: list[str],
+    *,
+    force_send: bool = False,
+) -> bool:
+    if force_send:
+        return True
+    if exit_code != 0:
+        return True
+    if log_warnings:
+        return True
+    if _etl_issues(etl_rows):
+        return True
+    return False
+
+
 def _build_subject(exit_code: int, etl_rows: list[dict], log_warnings: list[str]) -> str:
     if exit_code != 0:
         return "[SOKUHO 失敗] 每日同步異常"
 
-    issues = [
-        r for r in etl_rows
-        if r["status"] in ("FAILED", "SKIPPED") or r["error_message"]
-    ]
-    if issues or log_warnings:
+    if _etl_issues(etl_rows) or log_warnings:
         return "[SOKUHO 警告] 同步完成但有異常需留意"
 
     max_date = next((r["report_date"] for r in etl_rows if r["report_date"]), None)
@@ -114,7 +159,7 @@ def _build_body(
         lines.append("狀態：失敗")
         if error_message:
             lines.append(f"錯誤：{error_message}")
-    elif any(r["status"] == "FAILED" for r in etl_rows) or log_warnings:
+    elif any(r["status"] == "FAILED" for r in etl_rows) or log_warnings or _etl_issues(etl_rows):
         lines.append("狀態：完成但有警告")
     else:
         lines.append("狀態：成功")
@@ -184,6 +229,15 @@ def main() -> None:
             exit_code = 1
             error_message = error_message or str(exc)
 
+    if not _needs_notification(
+        exit_code, etl_rows, log_warnings, force_send=args.force_send
+    ):
+        logger.info(
+            "同步正常且無異常，略過寄信（最新 DAILY：%s）",
+            max_daily_date or "（無資料）",
+        )
+        return
+
     subject = _build_subject(exit_code, etl_rows, log_warnings)
     body = _build_body(
         exit_code=exit_code,
@@ -200,7 +254,8 @@ def main() -> None:
         logger.error("寄送通知失敗：%s", exc)
         logger.error(
             "若為 OAuth 權限問題，請執行：uv run python scripts/send_sync_notification.py "
-            "--exit-code 0 --log-file logs/sokuho_sync_YYYYMMDD.log 以重新授權 gmail.send"
+            "--exit-code 0 --log-file logs/sokuho_sync_YYYYMMDD.log --force-send "
+            "以重新授權 gmail.send"
         )
         sys.exit(1)
 

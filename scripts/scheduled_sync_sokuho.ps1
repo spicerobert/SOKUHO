@@ -120,7 +120,7 @@ catch {
     Write-Log "=== SOKUHO scheduled sync failed ==="
 }
 finally {
-    Write-Log "寄送同步結果通知信"
+    Write-Log "檢查是否需寄送同步結果通知信（僅失敗／異常時寄出）"
     $notifyArgs = @(
         "run", "python", "scripts/send_sync_notification.py",
         "--exit-code", $exitCode
