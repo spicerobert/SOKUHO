@@ -19,7 +19,7 @@ EXPECTED_STORE_NAMES = {
     "Hsin-Chu Big City", "Taichung Far Eastern",
     "Kaohsiung Sogo", "Kaohsiung Zuoying", "Tainan Mitsukoshi",
     "Non-Taipei Area", "Existing Store Sales",
-    "Far Eastern A13", "CL SOGO B1", "Hanshin Kaohsiung",
+    "Far Eastern A13", "Taipei Dome", "CL SOGO B1", "Hanshin Kaohsiung",
     "Taichung Mitsukoshi", "New Store Sales", "ALL 18 STORES",
     "Webshop", "Showroom", "Taiwan High Speed Rail",
     "TNHR", "Costco", "Anhe store", "Taipei 101", "MOMO", "Rainbow Market", "Temporary Stall",

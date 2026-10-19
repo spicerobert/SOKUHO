@@ -7,7 +7,8 @@
 -- 排在最後，方便你之後再分類。
 --
 -- 天母：Tian-Mu Sogo → 1043、TM；Tian-Mu Mitsukoshi → 1075、TMMK（2026-05+ Format E 起 PDF 亦有此列）。
--- Dome Hanshin：1041 DOME；高雄區：1042 Kaohsiung Sogo KS、1003 Hanshin Kaohsiung HS、9105 Kaohsiung Area 小計。
+-- Dome Hanshin：1041 DOME（高雄巨蛋漢神）；Taipei Dome：1079 TD（台北大巨蛋，2026-08-24 新增，與 1041 非同一家）。
+-- 高雄區：1042 Kaohsiung Sogo KS、1003 Hanshin Kaohsiung HS、1041 Dome Hanshin、9105 Kaohsiung Area 小計。
 --
 -- 地區小計代號 9101–9105 為暫用，可日後換成 ERP 正式碼。
 -- store_type：N'store'＝實體門市（含原臨時櫃），其餘為 HQ、subtotal、grand_total 等。
@@ -33,6 +34,7 @@ USING (
     (N'1053', N'Breeze Nanjing',          N'BN',    N'store',       10),
     (N'9001', N'Taipei Area',             N'TPE_SUB',   N'subtotal',    11),
     (N'1073', N'Far Eastern A13',         N'A13',   N'store',       12),
+    (N'1079', N'Taipei Dome',             N'TD',    N'store',       12),
     -- ── Taoyuan ───────────────────────────────────────────────
     (N'1008', N'CL SOGO B1',              N'CL',    N'store',       13),
     (N'1077', N'Gloria Outlets',         N'Gloria', N'store',     13),

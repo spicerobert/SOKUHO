@@ -63,6 +63,7 @@ USING (
     (N'1053', N'Breeze Nanjing',          N'BN',    N'store',       10),
     (N'9001', N'Taipei Area',             N'TPE_SUB',   N'subtotal',    11),
     (N'1073', N'Far Eastern A13',         N'A13',   N'store',       12),
+    (N'1079', N'Taipei Dome',             N'TD',    N'store',       12),
     (N'1008', N'CL SOGO B1',              N'CL',    N'store',       13),
     (N'1077', N'Gloria Outlets',         N'Gloria', N'store',     13),
     (N'9101', N'Taoyuan Area',            N'TYN_SUB',   N'subtotal',    14),

@@ -5,7 +5,7 @@ Each PDF (2 pages) encodes two rows per store:
   Row 1 → DAILY  : single-day figures
   Row 2 → MTD    : month-to-date cumulative
 
-Five PDF formats are handled (detected by row-count):
+Six PDF formats are handled (detected by row-count):
 
   Format A  (Oct)        : page1=17 stores, page2=10 stores
   Format B  (Nov 1-5)    : page1=17 stores, page2=8  stores  (no OFFICE/GRAND)
@@ -18,6 +18,10 @@ Five PDF formats are handled (detected by row-count):
                                                                on page 1; Costco /
                                                                Anhe / BD channels
                                                                on page 2)
+  Format F  (2026-08-22+): page1=20 stores, page2=13 stores  (Taipei Dome 1079
+                                                               + New Store Sales
+                                                               on page 2; not
+                                                               Dome Hanshin 1041)
 
 Column layout (0-indexed; NAME at col 0):
   0  NAME
@@ -180,6 +184,25 @@ _P2_E = [
     "GRAND TOTAL",
 ]  # 11 stores → 22 rows
 
+# Page 2 – format F (2026-08-22+): Taipei Dome (1079, 台北大巨蛋) is a new
+# Taipei store, distinct from page-1 Dome Hanshin (1041, 高雄巨蛋漢神).
+# New Store Sales reappears as the new-store subtotal.
+_P2_F = [
+    "Taipei Dome",
+    "New Store Sales",
+    "ALL 18 STORES",
+    "Costco",
+    "Anhe store",
+    "Webshop",
+    "Showroom",
+    "China Airlines",
+    "Duty Free",
+    "Taiwan High Speed Rail",
+    "Business Development",
+    "OFFICE & WEB TOTAL",
+    "GRAND TOTAL",
+]  # 13 stores → 26 rows
+
 # Map: (page1_store_count, page2_store_count) → (p1_list, p2_list, format_label)
 _FORMAT_TABLE = [
     (17, 10, _P1_v1, _P2_A, "A"),
@@ -187,6 +210,7 @@ _FORMAT_TABLE = [
     (17, 11, _P1_v1, _P2_D, "D"),
     (19,  9, _P1_v2, _P2_C, "C"),
     (20, 11, _P1_v3, _P2_E, "E"),
+    (20, 13, _P1_v3, _P2_F, "F"),
 ]
 
 # ── Table extraction settings ───────────────────────────────────────────────
