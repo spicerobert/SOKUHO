@@ -264,12 +264,49 @@ def _is_data_row(row: list) -> bool:
     """
     if not row:
         return False
+    # Column-header row repeated inside the table, e.g. [None, 'RESULT', 'BUDGET', '0', 'RESULT', 'Yoy']
+    if len(row) > 1 and str(row[1] or "").strip().upper() == "RESULT":
+        return False
     check = row[1:6] if len(row) > 5 else row[1:]
     for c in check:
         v = to_float(c)
         if v is not None:
             return True
     return False
+
+
+def _row_name(row: list) -> str | None:
+    first = row[0] if row else None
+    if first in (None, "") or to_float(first) is not None:
+        return None
+    return _normalize_store_name(str(first))
+
+
+def _pair_rows(rows: list[list], store_list: list, where: str) -> list[tuple]:
+    """
+    Pair rows into (store_name, daily_row, mtd_row).
+
+    A row with a NAME cell is a store's DAILY row; the unnamed row right after it is its MTD.
+    Pairing by position (rows[2i], rows[2i+1]) shifts every later store by one when the table
+    carries one extra row (2026-05-09: a second header row; 2025-10-24: a page break that
+    dropped A13's DAILY row) — so pair by name and skip orphan unnamed rows.
+    Pages with no NAME cells at all fall back to position + the hardcoded store_list.
+    """
+    if not any(_row_name(r) for r in rows):
+        return [
+            (store_list[i], rows[2 * i], rows[2 * i + 1] if 2 * i + 1 < len(rows) else None)
+            for i in range(min(len(rows) // 2, len(store_list)))
+        ]
+    pairs: list[tuple] = []
+    for row in rows:
+        name = _row_name(row)
+        if name:
+            pairs.append([name, row, None])
+        elif pairs and pairs[-1][2] is None:
+            pairs[-1][2] = row
+        else:
+            logger.warning("%s: unnamed row without a store row before it, skipped: %s", where, row[:3])
+    return [tuple(p) for p in pairs]
 
 
 def _extract_data_rows(page) -> list[list]:
@@ -423,52 +460,16 @@ def parse_pdf(pdf_path: str | Path) -> list[dict]:
                 )
 
         # Build records from both pages
-        for rows, store_list in [(rows_p1, p1_list), (rows_p2, p2_list)]:
-            store_pairs = len(rows) // 2
-            for store_idx in range(store_pairs):
-                daily_idx = store_idx * 2
-                mtd_idx = daily_idx + 1
-
-                daily_row = rows[daily_idx] if daily_idx < len(rows) else None
-                mtd_row = rows[mtd_idx] if mtd_idx < len(rows) else None
-
-                if not daily_row:
-                    logger.warning(
-                        "%s: empty daily row at index %d (format %s).",
-                        pdf_path.name, store_idx, fmt,
-                    )
-                    continue
-
-                # Fallback: use the hardcoded store_list label for this index (when available).
-                fallback_name = store_list[store_idx] if store_idx < len(store_list) else None
-
-                # Prefer the NAME cell in PDF table (first column) when it is textual.
-                store_name_daily = fallback_name
-                if daily_row:
-                    first = daily_row[0]
-                    if to_float(first) is None and first not in (None, ""):
-                        store_name_daily = _normalize_store_name(str(first))
-
-                if store_name_daily is None:
-                    logger.warning(
-                        "%s: cannot resolve store_name for page row %d (format %s).",
-                        pdf_path.name, store_idx, fmt,
-                    )
-                    continue
-
+        for page_num, (rows, store_list) in enumerate(
+            [(rows_p1, p1_list), (rows_p2, p2_list)], start=1
+        ):
+            for name, daily_row, mtd_row in _pair_rows(rows, store_list, f"{pdf_path.name} page {page_num}"):
                 records.append(
-                    _build_record(daily_row, store_name_daily, "DAILY", report_date, pdf_path.name)
+                    _build_record(daily_row, name, "DAILY", report_date, pdf_path.name)
                 )
-
-                store_name_mtd = store_name_daily
-                if mtd_row:
-                    first = mtd_row[0]
-                    if to_float(first) is None and first not in (None, ""):
-                        store_name_mtd = _normalize_store_name(str(first))
-
                 if mtd_row is not None:
                     records.append(
-                        _build_record(mtd_row, store_name_mtd, "MTD", report_date, pdf_path.name)
+                        _build_record(mtd_row, name, "MTD", report_date, pdf_path.name)
                     )
 
     logger.info(

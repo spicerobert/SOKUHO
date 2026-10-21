@@ -341,6 +341,15 @@ def load_file(
             return 0
 
     try:
+        if force:
+            # Re-processing replaces this file's rows for this day: MERGE alone keeps rows the new parse
+            # no longer yields (2026-10-21: misaligned old parses left e.g. THSR DAILY 3,172,499).
+            # Same transaction as the MERGE (load_dataframe commits; rollback below restores).
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM fact_sales WHERE report_date = ? AND source_file = ?",
+                    report_date, source_file,
+                )
         n = load_dataframe(conn, df, store_map)
         log_result(conn, source_file, report_date, n, "SUCCESS", success_note)
         if resolution is not None:
