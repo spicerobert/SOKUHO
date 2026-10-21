@@ -11,7 +11,6 @@ import logging
 import os
 import re
 import sys
-from datetime import datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -73,16 +72,16 @@ def _read_log_warnings(log_file: Path | None) -> list[str]:
 
 
 def _fetch_recent_etl_log(conn, lookback_minutes: int) -> list[dict]:
-    since = datetime.now() - timedelta(minutes=lookback_minutes)
+    # 回溯窗由 DB 端算：run_at 預設 GETDATE()，容器時區是 UTC，與本機 datetime.now() 差 8 小時。
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT report_date, source_file, status, records_loaded, error_message, run_at
             FROM etl_log
-            WHERE run_at >= ?
+            WHERE run_at >= DATEADD(MINUTE, -?, GETDATE())
             ORDER BY run_at DESC
             """,
-            since,
+            lookback_minutes,
         )
         rows = cur.fetchall()
     return [

@@ -78,7 +78,8 @@ catch {
     Write-Log "=== SOKUHO scheduled sync failed ==="
 }
 finally {
-    Write-Log "檢查是否需寄送同步結果通知信（僅失敗／異常時寄出）"
+    # 這行會寫進 log，不可含 send_sync_notification.py 的 WARN_PATTERNS 字詞（如「失敗」），否則每次都誤寄警告信
+    Write-Log "檢查是否需寄送同步結果通知信（只在有問題時寄出）"
     $notifyArgs = @(
         "run", "python", "scripts/send_sync_notification.py",
         "--exit-code", $exitCode

@@ -143,6 +143,8 @@ Date =
 
 PosInsight 在正式機的 `integration_pos_db` 容器（Integration_of_POS 的 compose 管理，port 1434），本專案不再有自己的 Docker。
 
+執行 ETL 的機器需先安裝 **Microsoft ODBC Driver 18 for SQL Server**（`etl/loader.py` 寫死用這個驅動；Windows 內建的舊版 SQL Server 驅動不行）。
+
 **災難復原用 .bak 還原**，不要從 `db/*.sql` 重建：`fact_kouseihi_*` 的 DDL 不在 `db/` 裡。每日 06:30 由 `scripts/backup_sokuho_db.py` 備份到 `.env` 的 `SOKUHO_BAK_DEST`（保留 30 份），還原方式見該檔檔頭；首次搬遷見 `db/prod_restore.sql`。
 
 從零建立的參考順序（僅供開發）：
