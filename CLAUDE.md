@@ -32,7 +32,7 @@ uv run python scripts/scrape_final.py && uv run python scripts/load_macro.py --r
 ```
 
 排程只在正式機上跑：
-- 每日 12:00「SOKUHO Daily Sync」跑 `scripts/scheduled_sync_sokuho.ps1`（Gmail 同步 → 匯入，日誌在 `logs/`；只有真正失敗或異常才寄信通知）。註冊：`scripts/register_sokuho_scheduled_task.ps1`。
+- 每日 10:00「SOKUHO Daily Sync」跑 `scripts/scheduled_sync_sokuho.ps1`（Gmail 同步 → 匯入，日誌在 `logs/`；只有真正失敗或異常才寄信通知）。註冊：`scripts/register_sokuho_scheduled_task.ps1`。
 - 每日 06:30「SOKUHO - 每日 .bak 備份」跑 `scripts/backup_sokuho_db.py`，備份到 `.env` 的 `SOKUHO_BAK_DEST`，保留 30 份。註冊：`scripts/register_sokuho_backup_task.ps1`。
 
 `GMAIL_LOGIN_HINT`、`EDGE_PROFILE_DIR`、`NOTIFY_EMAIL` 只能由 `.env` 提供，不要在 ps1 設預設值：`load_dotenv()` 不覆蓋既有環境變數，ps1 先設了 `.env` 就失效。

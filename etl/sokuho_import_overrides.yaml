@@ -61,3 +61,15 @@ overrides:
     instead_of_basename: "SOKUHO 2026.04.28.pdf"
     path_contains: "202604"
     note: "原標準檔已移除，改採 new 版為正式匯入來源"
+
+  "2026-09-03":
+    use_basename: "SOKUHO 2026.09.03.pdf"
+    ignore_basenames:
+      - "SOKUHO 2026.09.03 NEW.pdf"
+    note: "兩檔銷售／客數／轉單完全相同；NEW 版缺含轉單 YoY%，採原檔"
+
+  "2026-10-07":
+    use_basename: "SOKUHO 2026.10.07.pdf"
+    ignore_basenames:
+      - "SOKUHO 2026.10.07 (NO PERSONNEL EXPENDITURES).pdf"
+    note: "兩檔僅人事費不同（人事費匯入時本就寫 NULL），採標準檔"
