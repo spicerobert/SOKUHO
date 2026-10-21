@@ -1,11 +1,11 @@
-﻿# SOKUHO 每日自動同步：啟動 Docker → Gmail 增量下載 → 匯入 PosInsight
+﻿# SOKUHO 每日自動同步：Gmail 增量下載 → 匯入 PosInsight
 # 由 Windows 工作排程器呼叫；日誌寫入 logs/sokuho_sync_YYYYMMDD.log
+# PosInsight 在正式機的 integration_pos_db 容器內（Integration_of_POS 管理），本腳本不啟動 Docker；
+# 連不上時 sync_and_import_sokuho.py 會 exit 1，由 finally 的通知信回報。
 
 $ErrorActionPreference = "Stop"
 
-$ProjectRoot = "E:\Git\SOKUHO"
-$UvExe = "D:\Python\Scripts\uv.exe"
-$DockerExe = "D:\Docker\resources\bin\docker.exe"
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $ProjectRoot "logs"
 $LogFile = Join-Path $LogDir ("sokuho_sync_{0:yyyyMMdd}.log" -f (Get-Date))
 
@@ -19,7 +19,7 @@ function Write-Log {
     Write-Host $line
 }
 
-# 執行原生指令並逐行記錄輸出。docker / python 會把正常訊息寫到 stderr，
+# 執行原生指令並逐行記錄輸出。python 會把正常訊息寫到 stderr，
 # 若在 $ErrorActionPreference = "Stop" 下用 2>&1 管線會被誤判為終止錯誤，
 # 故此處暫時切成 Continue，改以結束碼（$LASTEXITCODE）判斷成敗。
 function Invoke-Logged {
@@ -42,68 +42,26 @@ function Invoke-Logged {
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 Set-Location $ProjectRoot
 $env:PYTHONIOENCODING = "utf-8"
-$env:Path = "D:\Python\Scripts;D:\Docker\resources\bin;" + $env:Path
-# 強制公司 Gmail / Edge 設定檔，避免排程重授權時開到個人設定檔。
-# 換機時請先查 Local State 對應 robert@auntstella.com.tw 的 Folder，再改 EDGE_PROFILE_DIR。
-$env:GMAIL_LOGIN_HINT = if ($env:GMAIL_LOGIN_HINT) { $env:GMAIL_LOGIN_HINT } else { "robert@auntstella.com.tw" }
-$env:EDGE_PROFILE_DIR = if ($env:EDGE_PROFILE_DIR) { $env:EDGE_PROFILE_DIR } else { "Profile 1" }
-$env:NOTIFY_EMAIL = if ($env:NOTIFY_EMAIL) { $env:NOTIFY_EMAIL } else { "robert@auntstella.com.tw" }
-# 讓 PowerShell 以 UTF-8 解碼子程序（python/docker）輸出，避免中文在 log 變亂碼。
+# 排程環境的 PATH 可能沒有 uv；依序找 PATH、使用者安裝位置、開發機舊位置。
+$UvExe = (Get-Command uv -ErrorAction SilentlyContinue).Source
+if (-not $UvExe) {
+    $UvExe = @("$env:USERPROFILE\.local\bin\uv.exe", "D:\Python\Scripts\uv.exe") |
+        Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+# GMAIL_LOGIN_HINT / EDGE_PROFILE_DIR / NOTIFY_EMAIL 一律由 .env 提供（每台機器的 Edge 設定檔不同）。
+# 不可在這裡設預設值：Python 的 load_dotenv() 不覆蓋既有環境變數，會讓 .env 失效。
+# 讓 PowerShell 以 UTF-8 解碼子程序（python）輸出，避免中文在 log 變亂碼。
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 Write-Log "=== SOKUHO scheduled sync started ==="
-Write-Log ("Gmail hint={0}; Edge profile={1}" -f $env:GMAIL_LOGIN_HINT, $env:EDGE_PROFILE_DIR)
 
 $exitCode = 0
 $errorMsg = $null
 
 try {
-    if (-not (Test-Path $UvExe)) {
-        throw "找不到 uv：$UvExe"
+    if (-not $UvExe) {
+        throw "找不到 uv（PATH、$env:USERPROFILE\.local\bin、D:\Python\Scripts 都沒有）"
     }
-    if (-not (Test-Path $DockerExe)) {
-        throw "找不到 docker：$DockerExe"
-    }
-
-    # pos_insight_db 可能由另一個 compose 專案（E:\Git\POS_Insight）建立並與本專案共用；
-    # 若容器已存在就直接啟動，避免從 SOKUHO 目錄跑 compose 因容器名稱衝突而失敗。
-    Write-Log "確認 PosInsight 資料庫容器狀態"
-    $containerStatus = & $DockerExe inspect --format "{{.State.Status}}" pos_insight_db 2>$null
-    if ($containerStatus -eq "running") {
-        Write-Log "pos_insight_db 已在執行中，略過啟動"
-    }
-    elseif ($containerStatus) {
-        Write-Log "pos_insight_db 已存在（狀態：$containerStatus），啟動容器"
-        $null = Invoke-Logged -Exe $DockerExe -Arguments @("start", "pos_insight_db")
-    }
-    else {
-        Write-Log "pos_insight_db 不存在，以 docker compose 建立"
-        $null = Invoke-Logged -Exe $DockerExe -Arguments @("compose", "up", "-d")
-    }
-
-    $maxWaitSec = 90
-    $waited = 0
-    $healthy = $false
-    while ($waited -lt $maxWaitSec) {
-        $status = & $DockerExe inspect --format "{{.State.Health.Status}}" pos_insight_db 2>$null
-        if ($status -eq "healthy") {
-            $healthy = $true
-            break
-        }
-        if ($status -eq "running") {
-            # 舊容器可能沒有 healthcheck 狀態，稍等後視為就緒
-            Start-Sleep -Seconds 5
-            $healthy = $true
-            break
-        }
-        Start-Sleep -Seconds 3
-        $waited += 3
-    }
-
-    if (-not $healthy) {
-        throw "pos_insight_db 在 ${maxWaitSec}s 內未就緒，請手動執行 docker compose up -d"
-    }
-    Write-Log "PosInsight 資料庫已就緒"
 
     Write-Log "執行 sync_and_import_sokuho.py"
     $exitCode = Invoke-Logged -Exe $UvExe -Arguments @("run", "python", "scripts/sync_and_import_sokuho.py")

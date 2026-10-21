@@ -71,10 +71,12 @@ def gmail_from_clause(senders: list[str]) -> str:
 
 
 def require_database() -> None:
-    """Fail fast with a clear hint when Docker / PosInsight is not running."""
-    from etl.docker_db import ensure_posinsight_running
+    """Fail fast with a clear hint when PosInsight is unreachable.
 
-    def _ping() -> None:
+    資料庫在正式機的 integration_pos_db 容器內，本專案不負責啟動它；
+    不可自動 docker compose up（曾經會在本機另起一個空庫）。
+    """
+    try:
         conn = db.get_connection(
             server=os.environ["DB_SERVER"],
             database=os.environ["DB_NAME"],
@@ -82,24 +84,9 @@ def require_database() -> None:
             password=os.environ["DB_PASSWORD"],
         )
         conn.close()
-
-    try:
-        _ping()
-    except db.DatabaseUnavailableError:
-        logger.info("資料庫未連線，嘗試自動啟動 Docker / PosInsight …")
-        try:
-            ensure_posinsight_running()
-            _ping()
-        except (RuntimeError, subprocess.CalledProcessError) as exc:
-            logger.error("自動啟動資料庫失敗：%s", exc)
-            logger.error(
-                "請手動執行：docker compose up -d\n"
-                "並確認 Docker Desktop 已啟動。"
-            )
-            sys.exit(1)
-        except db.DatabaseUnavailableError as exc:
-            logger.error("%s", exc)
-            sys.exit(1)
+    except db.DatabaseUnavailableError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
 
 
 def get_last_imported_date(conn) -> date | None:

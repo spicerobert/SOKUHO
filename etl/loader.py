@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseUnavailableError(RuntimeError):
-    """SQL Server is not reachable (Docker / PosInsight likely not started)."""
+    """SQL Server is not reachable (production integration_pos_db likely down)."""
 
 
 def _connection_refused(exc: BaseException) -> bool:
@@ -29,15 +29,13 @@ def _connection_refused(exc: BaseException) -> bool:
 def _db_startup_hint(server: str, database: str) -> str:
     return (
         f"無法連線到 SQL Server（{server} / {database}）。\n"
-        "PosInsight 資料庫可能尚未啟動，請先執行：\n"
+        "PosInsight 在正式機的 integration_pos_db 容器（port 1434）。請確認：\n"
         "\n"
-        "  docker compose up -d\n"
+        "  1. 本機在 CF 網段（HQ 連不到正式機）\n"
+        "  2. 正式機已登入、Docker Desktop 已啟動：docker ps --filter name=integration_pos_db\n"
+        "  3. .env 的 DB_SERVER 正確（正式機本機為 127.0.0.1,1434；開發機為 <正式機 IP>,1434）\n"
         "\n"
-        "確認容器已 healthy：\n"
-        "\n"
-        "  docker ps --filter name=pos_insight_db\n"
-        "\n"
-        "啟動完成後請重新執行本指令。"
+        "確認後請重新執行本指令。"
     )
 
 

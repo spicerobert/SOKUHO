@@ -40,21 +40,6 @@ uv run python db/apply_seed_stores.py
 
 請在**專案根目錄**執行；若尚未安裝依賴，先執行 `uv sync`。
 
-**Docker 內的 SQL Server**（本機 `docker compose up -d`）：`sqlserver` 服務已掛載 `./db` 至容器內 `/db`。更新 `db/seed_stores.sql` 後可擇一執行：
-
-```powershell
-# 一次性容器：套用最新 seed 至 dim_store（需已執行過 db/schema.sql）
-docker compose --profile seed-dim run --rm dim-store-seed
-```
-
-或進入主容器手動：
-
-```powershell
-docker compose exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -i /db/seed_stores.sql
-```
-
-（密碼與 `docker-compose.yml` 的 `SA_PASSWORD`／`SQLCMDPASSWORD` 一致；`exec` 時可加 `-P` 或設定環境變數 `SQLCMDPASSWORD`。）
-
 ### 補充
 
 - `--unknown-store-policy` 預設為 `skip_row`（未知門市只略過該列，其餘照常匯入）。
@@ -64,7 +49,7 @@ docker compose exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -
 
 ## 二、PowerBI 連線與查詢
 
-連線方式（PowerBI Desktop）：取得資料 → SQL Server → Server: `localhost,1433`，Database: `PosInsight`，展開進階選項後貼入查詢。
+連線方式（PowerBI Desktop）：取得資料 → SQL Server → Server: `<正式機 IP>,1434`（須在 CF 網段），Database: `PosInsight`，展開進階選項後貼入查詢。
 
 ### 欄位選擇重點
 
@@ -156,18 +141,15 @@ Date =
 
 ## 五、資料庫初始化
 
+PosInsight 在正式機的 `integration_pos_db` 容器（Integration_of_POS 的 compose 管理，port 1434），本專案不再有自己的 Docker。
+
+**災難復原用 .bak 還原**，不要從 `db/*.sql` 重建：`fact_kouseihi_*` 的 DDL 不在 `db/` 裡。每日 06:30 由 `scripts/backup_sokuho_db.py` 備份到 `.env` 的 `SOKUHO_BAK_DEST`（保留 30 份），還原方式見該檔檔頭；首次搬遷見 `db/prod_restore.sql`。
+
+從零建立的參考順序（僅供開發）：
+
 ```powershell
-# 啟動 SQL Server（Docker）
-docker compose up -d
-
-# 建立資料庫與 Views（主機 sqlcmd 或進容器執行 /db/schema.sql）
-sqlcmd -S localhost,1433 -U sa -P <password> -i db/schema.sql
-
-# 匯入門市主檔 dim_store（主機 sqlcmd）
-sqlcmd -S localhost,1433 -U sa -P <password> -i db/seed_stores.sql
-
-# 若 SQL 已在 Docker 內、且已掛載 ./db，可改用：
-docker compose --profile seed-dim run --rm dim-store-seed
+sqlcmd -S <server> -U <user> -P <password> -C -i db/schema.sql
+uv run python db/apply_seed_stores.py
 ```
 
 若資料庫仍是含 `area` 欄位的舊版 `dim_store`，請先執行 `db/migrate_dim_store_codes.sql` 再執行 seed。
