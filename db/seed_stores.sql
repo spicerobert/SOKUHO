@@ -73,6 +73,9 @@ USING (
     (N'4011', N'Business Development',  N'BD',    N'BD',          37),
     (N'4003', N'China Airlines',         N'China Air', N'BD',      38),
     (N'4004', N'Duty Free',              N'BD',    N'BD',          39),
+    -- 工廠（2026-05-15～31 PDF 才有）：Central Factory＝ERP 8001（領料／贈送），含在 GRAND TOTAL 內；FACTORY TOTAL 是它的小計
+    (N'8001', N'Central Factory',        N'CF',    N'internal',    40),
+    (N'9006', N'FACTORY TOTAL',          N'FACTORY_SUB', N'subtotal', 41),
     (N'9013', N'OFFICE & WEB TOTAL',      N'OFFWEB_SUB', N'subtotal', 33),
     (N'9999', N'GRAND TOTAL',             N'GRAND', N'grand_total', 34)
 ) AS s (store_code, store_name, store_short_name, store_type, display_order)

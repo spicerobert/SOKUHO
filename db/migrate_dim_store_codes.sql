@@ -35,7 +35,7 @@ SELECT
 FROM fact_sales        fs
 JOIN dim_store         ds ON ds.store_id = fs.store_id
 WHERE fs.record_type = 'DAILY'
-  AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web');
+  AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web', 'internal');
 GO
 
 IF OBJECT_ID('vw_mtd_store_sales', 'V') IS NOT NULL

@@ -141,7 +141,7 @@ SELECT
 FROM fact_sales        fs
 JOIN dim_store         ds ON ds.store_id = fs.store_id
 WHERE fs.record_type = 'DAILY'
-  AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web');
+  AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web', 'internal');
 GO
 
 -- Grand total summary by day (for KPI cards)
@@ -185,7 +185,7 @@ daily_month_sum AS (
     FROM fact_sales fs
     JOIN dim_store ds ON ds.store_id = fs.store_id
     WHERE RTRIM(fs.record_type) = 'DAILY'
-      AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web')
+      AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web', 'internal')
     GROUP BY YEAR(fs.report_date), MONTH(fs.report_date)
 )
 SELECT

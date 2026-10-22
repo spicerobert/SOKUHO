@@ -27,6 +27,7 @@ EXPECTED_STORE_NAMES = {
     "Business Development",
     "China Airlines",
     "Duty Free",
+    "Central Factory", "FACTORY TOTAL",
     "Taoyuan Area", "Hsinchu Area", "Taichung Area", "Tainan Area", "Kaohsiung Area",
     "OFFICE & WEB TOTAL", "GRAND TOTAL",
 }

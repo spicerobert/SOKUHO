@@ -412,6 +412,9 @@ def _normalize_store_name(name: str) -> str:
     # PDF 有時用 BD，dim_store 主檔為 Business Development（同代號 4011）
     if n == "BD":
         return "Business Development"
+    # 2026-05-15～31 工廠區小計：前 7 天寫「工廠」，之後寫 Factory TOTAL／FACTORY TOTAL（唯一成員 Central Factory 8001）
+    if n in ("工廠", "Factory TOTAL"):
+        return "FACTORY TOTAL"
     return n
 
 
