@@ -2,7 +2,7 @@
 
 **PosInsight**：詩特莉食品銷售數據平台。三個子系統共用 SQL Server 的 `PosInsight` 庫，Python 一律用 `uv`。
 
-**資料庫在正式機**：位於 Integration_of_POS 的容器 `integration_pos_db`（port 1434，compose 由 Integration_of_POS 管理），連線用 `.env` 的專用帳號，不用 sa。主機、帳號、備份路徑一律放 `.env`，不寫進 repo。本專案沒有自己的 Docker；不要加回自動 `docker compose up`，那會在本機另起一個空庫。開發機只有在 CF 網段才連得到（HQ 連不到）。開發機本機的 `pos_insight_db` 是 POS_STL_Cellection 在用（`posinsight` schema），SOKUHO 不再連它。搬遷交接紀錄放在備份共用資料夾的 `HANDOFF.md`（路徑見 `.env` 的 `SOKUHO_BAK_DEST`），不進 git。
+**資料庫在正式機**：位於 Integration_of_POS 的容器 `integration_pos_db`（port 1434，compose 由 Integration_of_POS 管理），連線用 `.env` 的專用帳號，不用 sa。主機、帳號、備份路徑一律放 `.env`，不寫進 repo。本專案沒有自己的 Docker；不要加回自動 `docker compose up`，那會在本機另起一個空庫。開發機已淘汰（2026-10-21 起收信／解析／入庫／上雲都在正式機 .120），不要再派工或連到開發機的庫。搬遷交接紀錄放在備份共用資料夾的 `HANDOFF.md`（路徑見 `.env` 的 `SOKUHO_BAK_DEST`），不進 git。
 
 | 子系統 | 資料來源 | 產出 |
 |--------|---------|------|
@@ -38,92 +38,14 @@ uv run python scripts/scrape_final.py && uv run python scripts/load_macro.py --r
 
 確認排程有沒有跑：`etl_log.run_at` 是 UTC，台灣時間要 +8 小時（10:00 的排程寫入的是 `02:0x`）。
 
+**`PosInsight` 與正式庫 `POS` 在同一個容器**：不對它做 DROP／TRUNCATE／沒有 WHERE 的 DELETE 來測試或除錯；規則全文見 `E:\Git\Integration_of_POS\.claude\rules\destructive-db-operations.md`。
+
 `GMAIL_LOGIN_HINT`、`EDGE_PROFILE_DIR`、`NOTIFY_EMAIL` 只能由 `.env` 提供，不要在 ps1 設預設值：`load_dotenv()` 不覆蓋既有環境變數，ps1 先設了 `.env` 就失效。
 
-## SOKUHO ETL
+## 往哪裡找
 
-`etl/pdf_parser.py` → `etl/transformer.py` → `etl/loader.py`；非標準 PDF 的覆寫設定在 `etl/sokuho_import_overrides.yaml`。
-
-PDF 格式依各頁門市數判斷，門市版面一改就要新增格式：
-
-| 格式 | P1 | P2 | 適用時期 |
-|------|----|----|---------|
-| A | 17 | 10 | 10 月 |
-| B | 17 | 8  | 11/1–5 |
-| D | 17 | 11 | 11/6–10 |
-| C | 19 | 9  | 11/11+（CL SOGO B1、Taichung Mitsukoshi 上移 P1） |
-| E | 20 | 11 | 2026-05+（Tian-Mu Mitsukoshi、Hanshin Kaohsiung 上移 P1；P2 為 Costco/Anhe/BD） |
-| F | 20 | 13 | 2026-08-22+（P2 新增 Taipei Dome 1079 台北大巨蛋、New Store Sales；**不是** 1041 Dome Hanshin 高雄巨蛋漢神） |
-
-- `fact_sales` 唯一鍵：`(report_date, store_id, record_type)`；`dim_store.store_type` = `store`/`subtotal`/`grand_total`/`HQ`
-- **人事費欄位強制寫 NULL**（`load_dataframe`），避免 DAX 誤用
-- 門市名稱正規化：Unicode 連字號 → `-`；`ALL 17/19 STORES` → `ALL 18 STORES`；`BD` → `Business Development`
-- 單日列和月累計列依店名配對（`_pair_rows`），不依位置；列數不符只記 info，有孤兒列才發 WARNING
-- 單日為 0 或缺列、當天客數 > 0 時，`derive_daily_from_mtd` 用月累計差補單日，標 `value_source='DERIVED'`；客數 0 是入帳調整，不補（view 的 `adjustment` 欄）
-- `--force` 只刪 (report_date, source_file)：改 overrides 換檔重載後，要查該日已經沒有舊 source_file 的列
-- `dim_store` 的英文名／簡稱和 Integration_of_POS `posinsight.dim_store` 同代號同名（4004 Duty Free／DF、4011 BD），改一邊要改兩邊
-
-### Gmail 同步陷阱
-
-- `auth/credentials.json`（OAuth installed-app，project `pipeline-499103`）、`auth/token.json` 皆被 gitignore，不可提交
-- 增量基準是 `fact_sales` 的 `MAX(report_date)`，只搜 `after:<基準日>`，**不會往回看**；漏抓時用 `--since <缺口前一日>` 回補
-- 寄件人：`bellecheng@` / `mantsu@`（代班）/ `billy@`，可用 `SOKUHO_GMAIL_SENDERS` 覆寫；只搜 bellecheng 會漏信
-- 主旨可能是日期範圍（`2026.07.03-07.05`、`2026.06.18~2026.06.21`），但附件一定是逐日的 `SOKUHO YYYY.MM.DD.pdf`；解析依附件檔名，存到 `PDF_DIR\<year>\<yyyymm>\`
-
-## KOUSEIHI ETL
-
-- 來源：`YYYYMM-KOUSEIHI Company.pdf`（2021–2025 為年度版，MM=12）；臨時例外 `E:\OneDrive - Aunt Stella Company\KOUSEIHI\202603-KOUSEIHI Company.pdf`
-- `fact_kouseihi_category` 唯一鍵 `(report_year, report_month, period_type, category)`，`period_type` = `MONTHLY`/`H1`/`H2`/`ANNUAL`
-- 驗收：category 600 列、kpi 375 列（5 年）；2025 TOTAL ANNUAL = 377,054,372 TWD
-- 規格書：`docs/SDD_KOUSEIHI_AND_ANALYSIS.md`
-
-**禮盒牌價門檻逐年調整，造成跨年結構性斷點**（以 `dim_gift_category_mapping` 正規化）：
-
-| 年份 | 類別代碼 | GIFT_LOW | GIFT_HIGH |
-|------|---------|----------|-----------|
-| 2021-2022 | `GIFT_760_DOWN/UP` | ≤760 | 761–5000 |
-| 2023 | `GIFT_850_DOWN/UP` | ≤850 | 851–5000 |
-| 2024-2025 | `GIFT_900_DOWN/UP` | ≤900 | 901–5000 |
-
-`GIFT_5000_UP` 為單筆 ≥5000 的大單（= `GIFT_LARGE`）。GIFT 系列約占年銷售 70–80%。
-
-## 禮盒分析預測
-
-- 正式版是 `scripts/run_gift_analysis_v2.py`；`run_gift_analysis.py` 為 v1 課程版，僅保留備查
-- 分群：`GIFT_LOW` / `GIFT_HIGH` / `GIFT_LARGE` / `GIFT_COMBINED`（= LOW + HIGH，不含大單）
-- **GIFT_COMBINED 一律用 bottom-up（LOW_pred + HIGH_pred）**，直接建模差很多（22.6% vs 13.6%）
-- 驗證：LOYO，val_years = [2023, 2024]
-- **MAPE 一律看 `outputs/v2_mape_summary.csv`**（`mape_summary.csv` 是 v1）；不要信 `docs/analysis_report.md` 的數字
-- 目標 MAPE：LOW <20%、HIGH <18%、LARGE <25%、COMBINED <15%；GIFT_HIGH 是唯一長期未達標的群
-
-### 已做過的關鍵修正（不要改回去）
-
-| 問題 | 修正 |
-|------|------|
-| GIFT_HIGH 被 lag_12m 污染 | 使用專屬特徵集，移除 `sales_lag_12m`、`trend_yoy_adj`、`yoy_estimate`、`comp_x_lag12` |
-| 2 月春節跨月 | `lag_12m_cny_adj`：以歷史非春節同月平均取代被污染的 lag_12m |
-| 中秋前置月被誤判 | `lead_1_mid_autumn=1` 時強制 `midautumn_shift_signal=0` |
-| 合成的 macro 特徵無效 | `REAL_MACRO_FEATURES = []`（預設停用） |
-| `load_macro.py` regex | `r"WD:(\d+)"`（曾誤寫成 `\\d`，造成 working_days 全為 NULL） |
-
-### GIFT_HIGH 卡關原因
-
-1. 2025 年 3–8 月比 2024 年系統性低 15–45%，但可用的 macro 指標是近似值
-2. 春節跨月極端值：2025/02 實際 1.98M，lag_12m（2024/02 春節）是 7.37M；訓練資料只有一個類似案例
-3. 2025 年中秋落在 10/6，9 月變成前置備貨月（76.2M，歷史最高），這種組合訓練資料裡從未出現
-
-要再改善，需要真實的 CCI、百貨業 YoY、受雇薪資月資料。
-
-## Macro 資料品質
-
-- **真實**：`cpi_total/food`、`unemployment`、`twd_usd/jpy`、`inbound_tourists`、`bsi`（NDC 景氣對策信號，60/60）；`dept_store_yoy` / `retail_trade_yoy` 2024/04 起為 MOEA 真實值
-- **近似**：`cci`（NCCU 站已下線）、`dept_store_yoy` 2021–2024/03（EE520 需登入）、`avg_wage_yoy`、`dept_store_sales`
-- **代理**：`gift_market_sentiment`、`stock_wealth_effect`
-- 零售業資料可從 MOEA EE521（`https://service.moea.gov.tw/EE521/visualize/VisDashboard.aspx?d=2`）取得，用 `Highcharts.charts[0].series` 擷取；百貨細目只有 EE520（需登入）和月報文字有
-- 更新腳本：`scripts/scrape_final.py`（MOEA）、`scripts/fetch_ndc_full.py`（BSI）
-
-## 業務規律
-
-- 春節月銷售約為平月 3–5 倍（1 月或 2 月，看春節落點）；中秋月約 2–4 倍
-- 2023 年門檻 760→850：GIFT_LOW 金額跳升，是牌價造成的，不是銷量
-- 交叉驗算：任一月 GIFT_COMBINED = GIFT_LOW + GIFT_HIGH
+| 主題 | 在哪 |
+|---|---|
+| SOKUHO 解析、補值、overrides、Gmail 同步陷阱（改 `scripts/sync_and_import_sokuho.py` 也要讀） | `etl/CLAUDE.md` |
+| KOUSEIHI ETL、禮盒分析預測、Macro、業務規律 | `skill kouseihi-gift-forecast` |
+| 上雲（`sokuho_daily`） | Integration_of_POS 的 `cloud_sync/CLAUDE.md` |
