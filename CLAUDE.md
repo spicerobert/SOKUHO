@@ -58,6 +58,10 @@ PDF 格式依各頁門市數判斷，門市版面一改就要新增格式：
 - `fact_sales` 唯一鍵：`(report_date, store_id, record_type)`；`dim_store.store_type` = `store`/`subtotal`/`grand_total`/`HQ`
 - **人事費欄位強制寫 NULL**（`load_dataframe`），避免 DAX 誤用
 - 門市名稱正規化：Unicode 連字號 → `-`；`ALL 17/19 STORES` → `ALL 18 STORES`；`BD` → `Business Development`
+- 單日列和月累計列依店名配對（`_pair_rows`），不依位置；列數不符只記 info，有孤兒列才發 WARNING
+- 單日為 0 或缺列、當天客數 > 0 時，`derive_daily_from_mtd` 用月累計差補單日，標 `value_source='DERIVED'`；客數 0 是入帳調整，不補（view 的 `adjustment` 欄）
+- `--force` 只刪 (report_date, source_file)：改 overrides 換檔重載後，要查該日已經沒有舊 source_file 的列
+- `dim_store` 的英文名／簡稱和 Integration_of_POS `posinsight.dim_store` 同代號同名（4004 Duty Free／DF、4011 BD），改一邊要改兩邊
 
 ### Gmail 同步陷阱
 
