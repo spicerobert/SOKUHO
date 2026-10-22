@@ -31,9 +31,12 @@ uv run python scripts/run_gift_analysis_v2.py [--from-csv]
 uv run python scripts/scrape_final.py && uv run python scripts/load_macro.py --raw-dir data/macro_raw
 ```
 
-排程只在正式機上跑：
-- 每日 10:00「SOKUHO Daily Sync」跑 `scripts/scheduled_sync_sokuho.ps1`（Gmail 同步 → 匯入，日誌在 `logs/`；只有真正失敗或異常才寄信通知）。註冊：`scripts/register_sokuho_scheduled_task.ps1`。
+排程只在正式機上跑；開發機（筆電）的排程已於 2026-10-22 刪除，不要在開發機重新註冊，兩邊同時跑會重複匯入、重複寄信：
+- 每日 10:00「SOKUHO Daily Sync」跑 `scripts/scheduled_sync_sokuho.ps1`（Gmail 同步 → 匯入，日誌在 `logs/`；只有真正失敗或異常才寄信通知）。訂 10:00 是因為 FIN 約 9 點寄報表。註冊：`scripts/register_sokuho_scheduled_task.ps1`。
 - 每日 06:30「SOKUHO - 每日 .bak 備份」跑 `scripts/backup_sokuho_db.py`，備份到 `.env` 的 `SOKUHO_BAK_DEST`，保留 30 份。註冊：`scripts/register_sokuho_backup_task.ps1`。
+- 下游的 10:15 雲端同步（`sokuho_daily` → Drive／BigQuery）也在正式機上，但不屬於本 repo；改 10:00 的同步時間時要一起考慮它。
+
+確認排程有沒有跑：`etl_log.run_at` 是 UTC，台灣時間要 +8 小時（10:00 的排程寫入的是 `02:0x`）。
 
 `GMAIL_LOGIN_HINT`、`EDGE_PROFILE_DIR`、`NOTIFY_EMAIL` 只能由 `.env` 提供，不要在 ps1 設預設值：`load_dotenv()` 不覆蓋既有環境變數，ps1 先設了 `.env` 就失效。
 
