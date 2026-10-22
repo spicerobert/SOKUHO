@@ -75,7 +75,7 @@ overrides:
     note: "兩檔僅人事費不同（人事費匯入時本就寫 NULL），採標準檔"
 
   "2026-08-31":
-    use_basename: "SOKUHO 2026.08.31.pdf"
-    note: "採原版（2026-09-02 匯入、Jack master 同）；0901 修正版的 DAILY 只差 A4 預算比，MTD 另加 ZX 8 月調撥 385,971、SR −162"
+    use_basename: "SOKUHO 2026.08.31-1-0901.pdf"
+    note: "採 0901 修正版（Robert 2026-10-22 確認）；與原版 DAILY 只差 A4 預算比，MTD 另加 ZX 8 月調撥 385,971、SR −162"
     ignore_basenames:
-      - "SOKUHO 2026.08.31-1-0901.pdf"
+      - "SOKUHO 2026.08.31.pdf"
