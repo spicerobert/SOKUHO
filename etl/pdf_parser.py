@@ -449,13 +449,14 @@ def parse_pdf(pdf_path: str | Path) -> list[dict]:
             len(rows_p2), len(p2_list),
         )
 
-        # Warn only if the mismatch is more than 2 rows (i.e. a real format issue)
+        # Info only: rows are paired by store name (_pair_rows), so a row-count mismatch no longer
+        # misaligns stores; a real problem shows up as an orphan-row WARNING there.
         for page_num, (rows, store_list) in enumerate(
             [(rows_p1, p1_list), (rows_p2, p2_list)], start=1
         ):
             expected = len(store_list) * 2
             if abs(len(rows) - expected) > 2:
-                logger.warning(
+                logger.info(
                     "%s page %d: expected %d data rows (%d stores), got %d. "
                     "Format detected: %s",
                     pdf_path.name, page_num, expected, len(store_list),

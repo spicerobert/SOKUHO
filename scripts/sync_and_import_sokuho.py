@@ -96,6 +96,15 @@ def get_last_imported_date(conn) -> date | None:
     return row[0] if row and row[0] else None
 
 
+def get_loaded_dates(conn, dates: set[date]) -> set[date]:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT report_date FROM fact_sales WHERE report_date IN (%s)" % ",".join("?" * len(dates)),
+            *sorted(dates),
+        )
+        return {row[0] for row in cur.fetchall()}
+
+
 def list_sokuho_messages(service, since: date) -> list[dict]:
     """Search only messages received on/after `since` (incremental, not full-mailbox).
 
@@ -221,22 +230,35 @@ def main() -> None:
         logger.info("沒有可用附件，結束。")
         return
 
-    from_date = min(found_dates)
-    to_date = max(found_dates)
-    logger.info("附件就緒，共 %d 個日期，範圍 %s ~ %s，開始匯入", len(found_dates), from_date, to_date)
+    # 只匯入還沒進 DB 的日期、一天一跑：用 min~max 一整段時，信箱裡一封補寄的舊報表
+    # （2026-10-22：3/30 那封）會把 200 多個已匯入的檔重新解析一遍，舊檔的 parser 警告就觸發誤報信。
+    if not (args.since and args.dry_run):
+        conn = db.get_connection(
+            server=os.environ["DB_SERVER"],
+            database=os.environ["DB_NAME"],
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+        )
+        found_dates -= get_loaded_dates(conn, found_dates)
+        conn.close()
+    if not found_dates:
+        logger.info("附件的日期都已匯入，結束。")
+        return
+    logger.info("待匯入 %d 個日期：%s", len(found_dates), ", ".join(d.isoformat() for d in sorted(found_dates)))
 
-    cmd = [
-        sys.executable, "main.py",
-        "--pdf-dir", str(pdf_dir),
-        "--from-date", from_date.isoformat(),
-        "--to-date", to_date.isoformat(),
-    ]
-    if args.dry_run:
-        cmd.append("--dry-run")
-
-    logger.info("執行匯入：%s", " ".join(cmd))
-    result = subprocess.run(cmd, cwd=Path(__file__).resolve().parent.parent)
-    sys.exit(result.returncode)
+    rc = 0
+    for d in sorted(found_dates):
+        cmd = [
+            sys.executable, "main.py",
+            "--pdf-dir", str(pdf_dir),
+            "--from-date", d.isoformat(),
+            "--to-date", d.isoformat(),
+        ]
+        if args.dry_run:
+            cmd.append("--dry-run")
+        logger.info("執行匯入：%s", " ".join(cmd))
+        rc = rc or subprocess.run(cmd, cwd=Path(__file__).resolve().parent.parent).returncode
+    sys.exit(rc)
 
 
 if __name__ == "__main__":

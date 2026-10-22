@@ -72,7 +72,7 @@ USING (
     (N'4008', N'Anhe store',            N'Anhe',  N'store',          36),
     (N'4011', N'Business Development',  N'BD',    N'BD',          37),
     (N'4003', N'China Airlines',         N'China Air', N'BD',      38),
-    (N'4004', N'Duty Free',              N'BD',    N'BD',          39),
+    (N'4004', N'Duty Free',              N'DF',    N'BD',          39),  -- 簡稱原為 BD，與 4011 撞名（Jack 2026-10-22）
     -- 工廠（2026-05-15～31 PDF 才有）：Central Factory＝ERP 8001（領料／贈送），含在 GRAND TOTAL 內；FACTORY TOTAL 是它的小計
     (N'8001', N'Central Factory',        N'CF',    N'internal',    40),
     (N'9006', N'FACTORY TOTAL',          N'FACTORY_SUB', N'subtotal', 41),

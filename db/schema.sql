@@ -70,6 +70,9 @@ CREATE TABLE fact_sales (
     -- ETL metadata
     source_file                 NVARCHAR(255),
     loaded_at                   DATETIME2       NOT NULL DEFAULT GETDATE(),
+    -- PDF＝報表原值；DERIVED＝依月累計差補的單日（規則見 etl/loader.py _DERIVE_SQL；舊庫用 migrate_value_source.sql 加）
+    value_source                VARCHAR(8)      NOT NULL CONSTRAINT df_fact_sales_value_source DEFAULT 'PDF'
+                                CONSTRAINT chk_fact_sales_value_source CHECK (value_source IN ('PDF', 'DERIVED')),
 
     CONSTRAINT fk_fact_store    FOREIGN KEY (store_id) REFERENCES dim_store(store_id),
     CONSTRAINT uq_fact_sales    UNIQUE (report_date, store_id, record_type),
@@ -137,9 +140,27 @@ SELECT
     fs.unit_price,
     fs.sales_result,
     fs.transfer_amount,
-    fs.sales_incl_result
+    fs.sales_incl_result,
+    fs.sales_budget_pct,
+    fs.sales_incl_budget_pct,
+    fs.sales_yoy_pct,
+    fs.sales_incl_yoy_pct,
+    fs.value_source,
+    -- 同一天的 MTD 列（PDF 原值；Jack 2026-10-22：月累計／MTD YoY 下游不自行重算）
+    m.sales_result                                  AS sales_mtd,
+    m.transfer_amount                               AS transfer_mtd,
+    m.sales_incl_result                             AS sales_incl_mtd,
+    m.sales_budget_pct                              AS sales_mtd_budget_pct,
+    m.sales_incl_budget_pct                         AS sales_incl_mtd_budget_pct,
+    m.sales_yoy_pct                                 AS sales_mtd_yoy_pct,
+    m.sales_incl_yoy_pct                            AS sales_incl_mtd_yoy_pct,
+    -- 只進月累計的入帳調整＝當日 MTD − 前日 MTD − 當日單日（月初前日 MTD 視為 0；前日缺 MTD 時為 NULL）
+    m.sales_result - CASE WHEN DAY(fs.report_date) = 1 THEN 0 ELSE p.sales_result END - fs.sales_result
+                                                    AS adjustment
 FROM fact_sales        fs
 JOIN dim_store         ds ON ds.store_id = fs.store_id
+LEFT JOIN fact_sales   m  ON m.store_id = fs.store_id AND m.report_date = fs.report_date AND m.record_type = 'MTD'
+LEFT JOIN fact_sales   p  ON p.store_id = fs.store_id AND p.report_date = DATEADD(DAY, -1, fs.report_date) AND p.record_type = 'MTD'
 WHERE fs.record_type = 'DAILY'
   AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web', 'internal');
 GO

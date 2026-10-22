@@ -207,6 +207,7 @@ WHEN MATCHED THEN
         sales_incl_budget_pct       = src.sales_incl_budget_pct,
         sales_incl_yoy_pct          = src.sales_incl_yoy_pct,
         source_file                 = src.source_file,
+        value_source                = 'PDF',
         loaded_at                   = GETDATE()
 WHEN NOT MATCHED THEN
     INSERT (
@@ -254,6 +255,44 @@ def _to_py(val: Any) -> Any:
     if hasattr(val, "item"):        # numpy scalar
         return val.item()
     return val
+
+
+# 單日補值（Jack 2026-10-22）：PDF 單日為 0（或缺列）、當天客數 > 0、前後月累計完整時，單日＝當日 MTD − 前日 MTD。
+# 客數 0 的「只進月累計」是入帳調整（例 Costco 10/13 MTD +768,600），不補——它在 vw_daily_store_sales.adjustment 看得到。
+# 缺列時客數取月累計客數差。report_date 為 NULL 時掃全部日期（回補用）。
+_DERIVE_SQL = """
+MERGE fact_sales AS tgt
+USING (
+    SELECT m.store_id, m.report_date, m.source_file,
+           m.sales_result - CASE WHEN DAY(m.report_date) = 1 THEN 0 ELSE p.sales_result END AS derived,
+           m.customer_count - CASE WHEN DAY(m.report_date) = 1 THEN 0 ELSE p.customer_count END AS cust_diff
+    FROM fact_sales m
+    JOIN dim_store ds ON ds.store_id = m.store_id AND ds.store_type NOT IN ('subtotal', 'grand_total')
+    LEFT JOIN fact_sales p ON p.store_id = m.store_id AND p.record_type = 'MTD'
+                          AND p.report_date = DATEADD(DAY, -1, m.report_date)
+    WHERE m.record_type = 'MTD' AND (? IS NULL OR m.report_date = ?)
+      AND (DAY(m.report_date) = 1 OR p.sales_result IS NOT NULL)
+) AS src
+ON tgt.store_id = src.store_id AND tgt.report_date = src.report_date AND tgt.record_type = 'DAILY'
+WHEN MATCHED AND ISNULL(tgt.sales_result, 0) = 0 AND tgt.customer_count > 0 AND src.derived > 0 THEN
+    UPDATE SET sales_result = src.derived,
+               sales_incl_result = src.derived + ISNULL(tgt.transfer_amount, 0),
+               value_source = 'DERIVED'
+WHEN NOT MATCHED AND src.cust_diff > 0 AND src.derived > 0 THEN
+    INSERT (report_date, store_id, record_type, sales_result, sales_incl_result, customer_count, source_file, value_source)
+    VALUES (src.report_date, src.store_id, 'DAILY', src.derived, src.derived, src.cust_diff, src.source_file, 'DERIVED');
+"""
+
+
+def derive_daily_from_mtd(conn: pyodbc.Connection, report_date: date | None = None) -> int:
+    """Fill a store's zero/missing DAILY sales from MTD(d) − MTD(d−1); returns rows changed."""
+    with conn.cursor() as cur:
+        cur.execute(_DERIVE_SQL, report_date, report_date)
+        n = cur.rowcount
+    conn.commit()
+    if n:
+        logger.info("DERIVED %d DAILY row(s) from MTD for %s", n, report_date or "all dates")
+    return n
 
 
 def load_dataframe(
@@ -351,6 +390,7 @@ def load_file(
                     report_date, source_file,
                 )
         n = load_dataframe(conn, df, store_map)
+        derive_daily_from_mtd(conn, report_date)
         log_result(conn, source_file, report_date, n, "SUCCESS", success_note)
         if resolution is not None:
             ignored_txt = (
