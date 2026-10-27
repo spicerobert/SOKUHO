@@ -258,6 +258,7 @@ def _to_py(val: Any) -> Any:
 
 
 # 單日補值（Jack 2026-10-22）：PDF 單日為 0（或缺列）、當天客數 > 0、前後月累計完整時，單日＝當日 MTD − 前日 MTD。
+# 只補門市（store_type='store'，Jack 2026-10-27）：Costco／BD 等非門市通路的跳動一律算入帳調整（例 Costco 2025-06-25）。
 # 客數 0 的「只進月累計」是入帳調整（例 Costco 10/13 MTD +768,600），不補——它在 vw_daily_store_sales.adjustment 看得到。
 # 缺列時客數取月累計客數差。report_date 為 NULL 時掃全部日期（回補用）。
 _DERIVE_SQL = """
@@ -267,7 +268,7 @@ USING (
            m.sales_result - CASE WHEN DAY(m.report_date) = 1 THEN 0 ELSE p.sales_result END AS derived,
            m.customer_count - CASE WHEN DAY(m.report_date) = 1 THEN 0 ELSE p.customer_count END AS cust_diff
     FROM fact_sales m
-    JOIN dim_store ds ON ds.store_id = m.store_id AND ds.store_type NOT IN ('subtotal', 'grand_total')
+    JOIN dim_store ds ON ds.store_id = m.store_id AND ds.store_type = 'store'
     LEFT JOIN fact_sales p ON p.store_id = m.store_id AND p.record_type = 'MTD'
                           AND p.report_date = DATEADD(DAY, -1, m.report_date)
     WHERE m.record_type = 'MTD' AND (? IS NULL OR m.report_date = ?)

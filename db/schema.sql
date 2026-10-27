@@ -123,8 +123,9 @@ GO
 -- VIEWS for PowerBI
 -- ============================================================
 
--- Daily sales：store/BD/HQ/SR/Web（排除 subtotal / grand_total；區域小計與總計在 Power BI 聚合）
-CREATE OR ALTER VIEW vw_daily_store_sales AS
+-- 每日全部列，含 PDF 的區域小計（subtotal）與 GRAND TOTAL（grand_total）原值；上雲 sokuho_daily 讀這個（Jack 2026-10-27：
+-- 已撤櫃門市去年的業績只在小計／GRAND 的 YoY 裡，門市列加總算不回來）。小計列不可跟門市列相加
+CREATE OR ALTER VIEW vw_daily_sales_all AS
 SELECT
     fs.report_date,
     YEAR(fs.report_date)                            AS report_year,
@@ -145,6 +146,8 @@ SELECT
     fs.sales_incl_budget_pct,
     fs.sales_yoy_pct,
     fs.sales_incl_yoy_pct,
+    fs.customer_yoy_pct,
+    fs.unit_price_yoy_pct,
     fs.value_source,
     -- 同一天的 MTD 列（PDF 原值；Jack 2026-10-22：月累計／MTD YoY 下游不自行重算）
     m.sales_result                                  AS sales_mtd,
@@ -154,6 +157,8 @@ SELECT
     m.sales_incl_budget_pct                         AS sales_incl_mtd_budget_pct,
     m.sales_yoy_pct                                 AS sales_mtd_yoy_pct,
     m.sales_incl_yoy_pct                            AS sales_incl_mtd_yoy_pct,
+    m.customer_yoy_pct                              AS customer_mtd_yoy_pct,
+    m.unit_price_yoy_pct                            AS unit_price_mtd_yoy_pct,
     -- 只進月累計的入帳調整＝當日 MTD − 前日 MTD − 當日單日（月初前日 MTD 視為 0；前日缺 MTD 時為 NULL）
     m.sales_result - CASE WHEN DAY(fs.report_date) = 1 THEN 0 ELSE p.sales_result END - fs.sales_result
                                                     AS adjustment
@@ -161,8 +166,14 @@ FROM fact_sales        fs
 JOIN dim_store         ds ON ds.store_id = fs.store_id
 LEFT JOIN fact_sales   m  ON m.store_id = fs.store_id AND m.report_date = fs.report_date AND m.record_type = 'MTD'
 LEFT JOIN fact_sales   p  ON p.store_id = fs.store_id AND p.report_date = DATEADD(DAY, -1, fs.report_date) AND p.record_type = 'MTD'
-WHERE fs.record_type = 'DAILY'
-  AND ds.store_type IN ('BD', 'HQ', 'SR', 'store', 'Web', 'internal');
+WHERE fs.record_type = 'DAILY';
+GO
+
+-- Daily sales：store/BD/HQ/SR/Web/internal（排除 subtotal / grand_total；區域小計與總計在 Power BI 聚合）
+-- SELECT * 在建 view 時綁定欄位：內層 vw_daily_sales_all 加欄後要重跑這段（或 sp_refreshview）
+CREATE OR ALTER VIEW vw_daily_store_sales AS
+SELECT * FROM vw_daily_sales_all
+WHERE store_type IN ('BD', 'HQ', 'SR', 'store', 'Web', 'internal');
 GO
 
 -- Grand total summary by day (for KPI cards)

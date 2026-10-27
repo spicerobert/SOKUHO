@@ -43,6 +43,8 @@ WARN_PATTERNS = re.compile(
     r")",
     re.IGNORECASE,
 )
+# uv 的提示：從別的專案的 shell 手動跑時 VIRTUAL_ENV 指向那邊，uv 改用本專案 .venv，不影響結果（2026-10-27 12:18 誤寄）
+UV_VENV_NOTICE = re.compile(r"VIRTUAL_ENV=.*does not match the project environment path")
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,7 +68,7 @@ def _read_log_warnings(log_file: Path | None) -> list[str]:
         return []
     lines: list[str] = []
     for line in log_file.read_text(encoding="utf-8", errors="replace").splitlines():
-        if WARN_PATTERNS.search(line):
+        if WARN_PATTERNS.search(line) and not UV_VENV_NOTICE.search(line):
             lines.append(line.strip())
     return lines[-20:]
 
