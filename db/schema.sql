@@ -151,6 +151,7 @@ SELECT
     fs.value_source,
     -- 同一天的 MTD 列（PDF 原值；Jack 2026-10-22：月累計／MTD YoY 下游不自行重算）
     m.sales_result                                  AS sales_mtd,
+    m.customer_count                                AS customer_count_mtd,
     m.transfer_amount                               AS transfer_mtd,
     m.sales_incl_result                             AS sales_incl_mtd,
     m.sales_budget_pct                              AS sales_mtd_budget_pct,
