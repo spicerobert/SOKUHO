@@ -32,11 +32,11 @@ uv run python scripts/scrape_final.py && uv run python scripts/load_macro.py --r
 ```
 
 排程只在正式機上跑；開發機（筆電）的排程已於 2026-10-22 刪除，不要在開發機重新註冊，兩邊同時跑會重複匯入、重複寄信：
-- 每日 11:00「SOKUHO Daily Sync」跑 `scripts/scheduled_sync_sokuho.ps1`（Gmail 同步 → 匯入，日誌在 `logs/`；只有真正失敗或異常才寄信通知）。訂 11:00 是因為 FIN 約 9 點寄報表。註冊：`scripts/register_sokuho_scheduled_task.ps1`。
+- 每日 10:00 與 11:00「SOKUHO Daily Sync」（同一個工作兩個觸發）跑 `scripts/scheduled_sync_sokuho.ps1`（Gmail 同步 → 匯入，日誌在 `logs/`；只有真正失敗或異常才寄信通知）。FIN 約 9 點寄報表，先在 10:00 收；沒收到，11:00 再收一次（腳本冪等：10:00 已匯入則 11:00 找不到新信、直接結束、不寄信）。註冊：`scripts/register_sokuho_scheduled_task.ps1`。
 - 每日 06:30「SOKUHO - 每日 .bak 備份」跑 `scripts/backup_sokuho_db.py`，備份到 `.env` 的 `SOKUHO_BAK_DEST`，保留 30 份。註冊：`scripts/register_sokuho_backup_task.ps1`。
-- 下游的 11:15 雲端同步（`sokuho_daily` → Drive／BigQuery）也在正式機上，但不屬於本 repo；改 11:00 的同步時間時要一起考慮它。
+- 下游的 11:15 雲端同步（`sokuho_daily` → Drive／BigQuery）也在正式機上，但不屬於本 repo；改同步時間時要一起考慮它（11:15 在 11:00 重試之後，所以兩次都趕得上）。
 
-確認排程有沒有跑：`etl_log.run_at` 是 UTC，台灣時間要 +8 小時（11:00 的排程寫入的是 `03:0x`）。
+確認排程有沒有跑：`etl_log.run_at` 是 UTC，台灣時間要 +8 小時（10:00 的排程寫入的是 `02:0x`，11:00 的是 `03:0x`）。
 
 **`PosInsight` 與正式庫 `POS` 在同一個容器**：不對它做 DROP／TRUNCATE／沒有 WHERE 的 DELETE 來測試或除錯；規則全文見 `E:\Git\Integration_of_POS\.claude\rules\destructive-db-operations.md`。
 
