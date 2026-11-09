@@ -1,5 +1,6 @@
-﻿# Register Windows Task Scheduler: SOKUHO daily sync at 10:00 + 11:00 retry
-# 10:00 同步；11:00 再跑一次補漏（同步腳本冪等：10:00 已匯入則 11:00 找不到新信、直接結束，不寄信）。
+﻿# Register Windows Task Scheduler: SOKUHO daily sync at 10:00 + 11:00 + 12:00 retries
+# 10:00 同步；11:00、12:00 再各跑一次補漏（同步腳本冪等：已匯入就找不到新信、直接結束，不寄信）。
+# FIN 2026-10-08～11-09 共 19 封的寄達時間是 09:10～11:51，其中 4 封在 11:00 之後，所以要有 12:00（2026-11-09）。
 # FIN 上班日約 9 點寄出速報；雲端同步排在 11:15（Integration_of_POS 管理）。
 # Usage: .\scripts\register_sokuho_scheduled_task.ps1
 # Remove: Unregister-ScheduledTask -TaskName "SOKUHO Daily Sync" -Confirm:$false
@@ -18,7 +19,7 @@ $Action = New-ScheduledTaskAction `
     -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`"" `
     -WorkingDirectory $ProjectRoot
 
-$Trigger = @("10:00AM", "11:00AM") | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
+$Trigger = @("10:00AM", "11:00AM", "12:00PM") | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
 
 # Interactive：Docker Desktop 與 Gmail 重授權（開 Edge）都需要使用者已登入。
 $Principal = New-ScheduledTaskPrincipal `
@@ -42,7 +43,7 @@ Register-ScheduledTask `
     -Force
 
 Write-Host "Registered: $TaskName"
-Write-Host "Schedule: daily at 10:00 and 11:00"
+Write-Host "Schedule: daily at 10:00, 11:00 and 12:00"
 Write-Host "Script:   $ScriptPath"
 Write-Host "Logs:     $ProjectRoot\logs\sokuho_sync_YYYYMMDD.log"
 Write-Host ""
